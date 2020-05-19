@@ -123,8 +123,3 @@ class Infer:
             img.save(f"{row}_{col}.png")
             print(f"{row}_{col}.png")
         return polygon_coordinates
-
-if __name__ == '__main__':
-    i = Infer('2020-04-10', credential='e8a0168a1ffc48ebad7fac2070ca9bf0').infer()
-    print(i)
-
