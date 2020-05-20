@@ -9,7 +9,7 @@ API_KEY = os.environ['API_KEY']
 SQS_QUEUE = 'ship_detection_sqs'
 
 # will need to change this to role based permission
-SQS_CONNECTOR = boto3.client(
+SQS_CONNECTOR = boto3.resource(
     'sqs',
     region_name='us-east-1',
     aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
