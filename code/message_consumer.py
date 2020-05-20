@@ -25,7 +25,7 @@ while True:
         message_body = message.body
         if message_body is not None:
             date = json.loads(message_body).get('date')
-            infer = Infer(date, API_KEY)
+            infer = Infer(date, credential=API_KEY)
             detections = infer.infer()
             print(f"for {date}, number of detections: {len(detections)}")
         else:
