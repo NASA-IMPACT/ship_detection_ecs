@@ -14,7 +14,7 @@ from config import (
 
 from copy import deepcopy
 from io import BytesIO
-from models import load_from_path
+from model import load_from_path
 
 from PIL import (
     Image,
