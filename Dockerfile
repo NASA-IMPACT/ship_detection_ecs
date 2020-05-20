@@ -25,7 +25,8 @@ RUN apt-get update --fix-missing && apt-get install -y --no-install-recommends\
 RUN mkdir /ship_detection/
 WORKDIR /ship_detection/
 COPY . /ship_detection/
-
+ARG  AWS_ACCESS_KEY_ID
+ARG  AWS_SECRET_ACCESS_KEY
 # install python package
 RUN pip3 --no-cache-dir install setuptools && \
     pip3 --no-cache-dir install wheel && \
