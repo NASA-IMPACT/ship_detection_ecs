@@ -11,7 +11,7 @@ SQS_QUEUE = 'ship_detection_sqs'
 # will need to change this to role based permission
 SQS_CONNECTOR = boto3.client(
     'sqs',
-    region='us-east-1',
+    region_name='us-east-1',
     aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
     aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY']
 )
