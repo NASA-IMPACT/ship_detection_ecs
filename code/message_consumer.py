@@ -16,6 +16,7 @@ SQS_CONNECTOR = boto3.resource(
     aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY']
 )
 
+detected_queue = SQS_CONNECTOR.get_queue_by_name(QueueName='ship_detected_sqs')
 while True:
     # Get the queue
     queue = SQS_CONNECTOR.get_queue_by_name(QueueName=SQS_QUEUE)
@@ -27,7 +28,9 @@ while True:
             date = json.loads(message_body).get('date')
             infer = Infer(date, credential=API_KEY)
             detections = infer.infer()
-            print(f"for {date}, number of detections: {len(detections)}")
+            detections = { 'date': date, 'detections': detections }
+            print(f"for {date}, number of detections: {len(detections['detections'])}")
+            detected_queue.send_message(MessageBody=json.dumps(detections))
         else:
             print('Please specify date')
         # delete message from queue
