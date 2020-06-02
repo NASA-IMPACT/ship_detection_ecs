@@ -36,9 +36,10 @@ while True:
     detected_queue_url = QUEUE_URL.format(DETECTED_QUEUE)
     detection_messages = sqs_connector.receive_message(
         QueueUrl=detection_queue_url, MessageAttributeNames=['date']
-    )['Messages']
+    )
+    messages = detection_messages.get('Messages', [])
     # extract date information for message
-    for msg in detection_messages:
+    for msg in messages:
         message_body = msg['Body']
         if message_body is not None:
             date = json.loads(message_body).get('date')
