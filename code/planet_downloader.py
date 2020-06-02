@@ -45,6 +45,7 @@ class PlanetDownloader:
         )
         body['filter']['config'][1]['config']['gt'] = start_date_time
         body['filter']['config'][1]['config']['lte'] = end_date_time
+        print(start_date_time, end_date_time)
         response = requests.post(SEARCH_URL, auth=(self.api_key, ''), json=body)
         # if not 200 raise error
         response.raise_for_status()
