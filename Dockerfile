@@ -14,10 +14,7 @@ RUN apt-get update --fix-missing && apt-get install -y --no-install-recommends\
         python3-gdal \
         libsm6 \
         vim \
-        wget \
-        zip \
         gcc \
-        npm \
         && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -25,7 +22,8 @@ RUN apt-get update --fix-missing && apt-get install -y --no-install-recommends\
 RUN mkdir /ship_detection/
 WORKDIR /ship_detection/
 COPY . /ship_detection/
-ENV API_KEY ""
+ARG API_KEY
+ENV API_KEY $API_KEY
 
 # install python package
 RUN pip3 --no-cache-dir install setuptools && \
