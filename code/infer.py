@@ -116,14 +116,14 @@ class Infer:
                 bbox = ship.bbox
                 xs = bbox[::2]
                 ys = bbox[1::2]
-                draw.rectangle(
-                    [
-                        (xs[0], ys[0]),
-                        (xs[1], ys[1])
-                    ],
-                    fill ='#ffff33',
-                    outline ='red'
-                )
+                # draw.rectangle(
+                #     [
+                #         (xs[0], ys[0]),
+                #         (xs[1], ys[1])
+                #     ],
+                #     fill ='#ffff33',
+                #     outline ='red'
+                # )
                 lons, lats = rasterio.transform.xy(
                     transform, (col * TILE_SIZE) + xs, (row * TILE_SIZE) + ys
                 )
