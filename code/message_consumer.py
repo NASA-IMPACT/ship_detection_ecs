@@ -16,7 +16,9 @@ ROLE_ARN = os.getenv('ROLE_ARN') or f"arn:aws:iam::853558080719:role/{ROLE_NAME}
 
 def assumed_role_session():
     client = boto3.client('sts')
-    creds = client.assume_role(RoleArn=ROLE_ARN, RoleSessionName=ROLE_NAME)
+    creds = client.assume_role(
+        RoleArn=ROLE_ARN, RoleSessionName=ROLE_NAME
+    )['Credentials']
     return boto3.session.Session(
         aws_access_key_id=creds['AccessKeyId'],
         aws_secret_access_key=creds['SecretAccessKey'],
