@@ -5,4 +5,4 @@ pillow
 pyproj
 rasterio
 scikit-image
-tensorflow==2.1.0
+tensorflow==2.0.0
