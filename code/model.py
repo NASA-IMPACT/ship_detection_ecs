@@ -78,7 +78,6 @@ def make_model(input_shape):
         d = layers.UpSampling2D(NET_SCALING)(d)
 
     seg_model = models.Model(inputs=[input_img], outputs=[d])
-    seg_model.summary()
     return seg_model
 
 

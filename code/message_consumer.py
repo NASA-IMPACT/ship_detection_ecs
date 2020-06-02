@@ -27,7 +27,7 @@ def assumed_role_session():
         region_name='us-east-1'
     )
 
-
+infer = Infer(credential=API_KEY)
 while True:
     # Get the queue
     session = assumed_role_session()
@@ -43,8 +43,7 @@ while True:
         message_body = msg['Body']
         if message_body is not None:
             date = json.loads(message_body).get('date')
-            infer = Infer(date, credential=API_KEY)
-            detections = infer.infer()
+            detections = infer.infer(date)
             detections = { 'date': date, 'detections': detections }
             print(f"for {date}, number of detections: {len(detections['detections'])}")
             sqs_connector.send_message(
