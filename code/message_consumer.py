@@ -9,10 +9,10 @@ ACCOUNT_NUMBER = '853558080719'
 API_KEY = os.environ['API_KEY']
 DETECTED_QUEUE = 'ship_detected_sqs'
 QUEUE_URL = f"https://queue.amazonaws.com/{ACCOUNT_NUMBER}/{{}}"
-ROLE_ARN = f'arn:aws:iam::{ACCOUNT_NUMBER}:role/{ROLE_NAME}'
-ROLE_NAME = 'ShipDetectionEcsRole'
 
-ROLE_ARN = f"arn:aws:iam::{ACCOUNT_NUMBER}:role/{ROLE_NAME}"
+ROLE_NAME = 'ShipDetectionEcsRole'
+ROLE_ARN = f'arn:aws:iam::{ACCOUNT_NUMBER}:role/{ROLE_NAME}'
+
 SQS_QUEUE = 'ship_detection_sqs'
 
 def assumed_role_session():
