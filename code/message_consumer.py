@@ -11,10 +11,9 @@ DETECTED_QUEUE = 'ship_detected_sqs'
 QUEUE_URL = f"https://queue.amazonaws.com/{ACCOUNT_NUMBER}/{{}}"
 ROLE_ARN = f'arn:aws:iam::{ACCOUNT_NUMBER}:role/{ROLE_NAME}'
 ROLE_NAME = 'ShipDetectionEcsRole'
-SQS_QUEUE = 'ship_detection_sqs'
 
 ROLE_ARN = f"arn:aws:iam::{ACCOUNT_NUMBER}:role/{ROLE_NAME}"
-
+SQS_QUEUE = 'ship_detection_sqs'
 
 def assumed_role_session():
     client = boto3.client('sts')
