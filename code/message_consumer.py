@@ -5,13 +5,15 @@ import time
 
 from infer import Infer
 
+ACCOUNT_NUMBER = '853558080719'
 API_KEY = os.environ['API_KEY']
-
-SQS_QUEUE = 'ship_detection_sqs'
+DETECTED_QUEUE = 'ship_detected_sqs'
+QUEUE_URL = f"https://queue.amazonaws.com/{ACCOUNT_NUMBER}/{{}}"
+ROLE_ARN = f'arn:aws:iam::{ACCOUNT_NUMBER}:role/{ROLE_NAME}'
 ROLE_NAME = 'ShipDetectionEcsRole'
+SQS_QUEUE = 'ship_detection_sqs'
 
-# Will need to make account number a variable too.
-ROLE_ARN = os.getenv('ROLE_ARN') or f"arn:aws:iam::853558080719:role/{ROLE_NAME}"
+ROLE_ARN = f"arn:aws:iam::{ACCOUNT_NUMBER}:role/{ROLE_NAME}"
 
 
 def assumed_role_session():
@@ -29,16 +31,14 @@ def assumed_role_session():
 while True:
     # Get the queue
     session = assumed_role_session()
-    sqs_connector = session.resource('sqs')
-    detection_queue = sqs_connector.get_queue_by_name(
-        QueueName=SQS_QUEUE
-    )
-    detected_queue = sqs_connector.get_queue_by_name(
-        QueueName='ship_detected_sqs'
-    )
-    print('Poll Started')
+    sqs_connector = session.client('sqs')
+    detection_queue_url = QUEUE_URL.format(SQS_QUEUE)
+    detected_queue_url = QUEUE_URL.format(DETECTED_QUEUE)
+
     # extract date information for message
-    for msg in detection_queue.receive_messages(MessageAttributeNames=['date']):
+    for msg in sqs_connector.receive_messages(
+        QueueUrl=detection_queue_url, MessageAttributeNames=['date']
+    ):
         message_body = msg.body
         if message_body is not None:
             date = json.loads(message_body).get('date')
@@ -46,7 +46,10 @@ while True:
             detections = infer.infer()
             detections = { 'date': date, 'detections': detections }
             print(f"for {date}, number of detections: {len(detections['detections'])}")
-            detected_queue.send_message(MessageBody=json.dumps(detections))
+            sqs_connector.send_message(
+                QueueUrl=detected_queue_url,
+                MessageBody=json.dumps(detections)
+            )
         else:
             print('Please specify date')
         # delete message from queue
