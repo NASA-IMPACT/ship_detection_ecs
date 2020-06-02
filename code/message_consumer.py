@@ -34,12 +34,12 @@ while True:
     sqs_connector = session.client('sqs')
     detection_queue_url = QUEUE_URL.format(SQS_QUEUE)
     detected_queue_url = QUEUE_URL.format(DETECTED_QUEUE)
-
-    # extract date information for message
-    for msg in sqs_connector.receive_message(
+    detection_messages = sqs_connector.receive_message(
         QueueUrl=detection_queue_url, MessageAttributeNames=['date']
-    ):
-        message_body = msg.body
+    )['Messages']
+    # extract date information for message
+    for msg in detection_messages:
+        message_body = msg['Body']
         if message_body is not None:
             date = json.loads(message_body).get('date')
             infer = Infer(date, credential=API_KEY)
@@ -53,7 +53,10 @@ while True:
         else:
             print('Please specify date')
         # delete message from queue
-        msg.delete()
+        sqs_connector.delete_message(
+            QueueUrl=detection_queue_url,
+            ReceiptHandle=msg['ReceiptHandle']
+        )
     print('Poll completed')
     # sleep for 10 second before trying to check new messages
     time.sleep(10)
