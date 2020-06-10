@@ -1,3 +1,5 @@
+import numpy as np
+
 from config import (
     UPSAMPLE_MODE,
     NET_SCALING,
@@ -85,3 +87,71 @@ def load_from_path(weight_file_path):
     seg_model = make_model((1, IMG_SIZE, IMG_SIZE, 3))
     seg_model.load_weights(weight_file_path)
     return seg_model
+
+
+def make_model_rcnn():
+    from mrcnn.config import Config
+    from mrcnn import utils
+    import mrcnn.model as modellib
+    from mrcnn import visualize
+    from mrcnn.model import log
+
+    model_path = '../weights/mask_rcnn_airbus_0022.h5'
+
+    class DetectorConfig(Config):
+        # Give the configuration a recognizable name
+        NAME = 'airbus'
+
+        GPU_COUNT = 1
+        IMAGES_PER_GPU = 9
+
+        BACKBONE = 'resnet50'
+
+        NUM_CLASSES = 2  # background and ship classes
+
+        IMAGE_MIN_DIM = 384
+        IMAGE_MAX_DIM = 768
+        RPN_ANCHOR_SCALES = (4, 8, 16, 32, 64)
+        TRAIN_ROIS_PER_IMAGE = 64
+        MAX_GT_INSTANCES = 14
+        DETECTION_MAX_INSTANCES = 10
+        DETECTION_MIN_CONFIDENCE = 0.95
+        DETECTION_NMS_THRESHOLD = 0.0
+
+        STEPS_PER_EPOCH = 15
+        VALIDATION_STEPS = 10
+
+        ## balance out losses
+        LOSS_WEIGHTS = {
+            "rpn_class_loss": 30.0,
+            "rpn_bbox_loss": 0.8,
+            "mrcnn_class_loss": 6.0,
+            "mrcnn_bbox_loss": 1.0,
+            "mrcnn_mask_loss": 1.2
+        }
+
+    class InferenceConfig(DetectorConfig):
+        GPU_COUNT = 1
+        IMAGES_PER_GPU = 1
+
+    import tensorflow as tf
+    #tf.config.experimental.set_visible_devices([], 'GPU')
+    inference_config = InferenceConfig()
+
+    # Recreate the model in inference mode
+    model = modellib.MaskRCNN(mode='inference',
+                              config=inference_config,
+                              model_dir='../data/')
+    model.load_weights(model_path, by_name=True)
+
+    return model
+
+
+def predict_rcnn(model, img):
+
+    prediction = model.detect([img])
+    mask =  prediction[0]['masks']
+    if mask.shape[2] == 0:
+        return np.zeros((*mask.shape[:2], 1))
+    else:
+        return mask * 255

@@ -14,7 +14,7 @@ from config import (
 
 from copy import deepcopy
 from io import BytesIO
-from model import load_from_path
+from model import load_from_path, make_model_rcnn, predict_rcnn
 
 from PIL import (
     Image,
@@ -40,66 +40,64 @@ class Infer:
 
     def __init__(self, weight_path=WEIGHT_FILE, credential=None):
         self.weight_path = weight_path
-        self.model = self.prepare_model()
+        self.model = make_model_rcnn()
         self.credential = credential
         self.planet_downloader = PlanetDownloader(credential)
-
 
     def prepare_date(self, date):
         return [f"{date}T00:00:00Z", f"{date}T23:59:59Z"]
 
-
     def prepare_model(self):
         return load_from_path(self.weight_path)
-
 
     def infer(self, date):
         self.start_date_time, self.end_date_time = self.prepare_date(date)
         detections = list()
-        for location, extent  in EXTENTS.items():
+        predictions = list()
+        for location, extent in EXTENTS.items():
             items = self.planet_downloader.search_ids(
                 extent, self.start_date_time, self.end_date_time
             )
             for item in items:
                 print(f"id: {item['id']}")
                 images = self.prepare_dataset(item['tiles'], item['id'])
-                predictions = self.model.predict((images / 255.))
-                columns, rows = [elem[1] - elem[0] for elem in item['tiles']]
-                predictions = predictions.reshape(
-                    (rows, columns, IMG_SIZE, IMG_SIZE)
-                )
-                images = images.reshape(
-                    (rows, columns, IMG_SIZE, IMG_SIZE, 3)
-                )
-                polygons = self.xy_to_latlon(
-                    predictions, images, rows, columns, item['coordinates']
-                )
-                detections.extend(polygons)
-        return { 'type': 'FeatureCollection', 'features': detections }
+                for image in images:
+                    predictions.append(predict_rcnn(self.model, image))
+            predictions = np.asarray(predictions)
+            columns, rows = [elem[1] - elem[0] for elem in item['tiles']]
+            predictions = predictions.reshape(
+                (rows, columns, IMG_SIZE, IMG_SIZE)
+            )
+            images = images.reshape(
+                (rows, columns, IMG_SIZE, IMG_SIZE, 3)
+            )
+            polygons = self.xy_to_latlon(
+                predictions, images, rows, columns, item['coordinates']
+            )
+            detections.extend(polygons)
+        return {'type': 'FeatureCollection', 'features': detections}
 
     def prepare_dataset(self, tile_range, tile_id):
         x_indices, y_indices = tile_range
         images = list()
         for x_index in list(range(*x_indices)):
-          for y_index in list(range(*y_indices)):
-            response = requests.get(
-              WMTS_URL.format(tile_id, x_index, y_index, self.credential)
-            )
-            response.raise_for_status()
-            img = np.asarray(
-              Image.open(BytesIO(response.content)).resize(
-                  (IMG_SIZE, IMG_SIZE)
-                ).convert('RGB')
-              )
-            images.append(img)
+            for y_index in list(range(*y_indices)):
+                response = requests.get(
+                    WMTS_URL.format(tile_id, x_index, y_index, self.credential)
+                )
+                response.raise_for_status()
+                img = np.asarray(
+                    Image.open(BytesIO(response.content)).resize(
+                        (IMG_SIZE, IMG_SIZE)
+                    ).convert('RGB')
+                )
+                images.append(img)
         return np.asarray(images)
-
 
     def prepare_geojson(self, coordinates):
         geojson = deepcopy(GEOJSON_TEMPLATE)
         geojson['geometry']['coordinates'] = coordinates
         return geojson
-
 
     def xy_to_latlon(self, grid_list, images, rows, cols, bounds):
         transform = rasterio.transform.from_bounds(
