@@ -30,7 +30,6 @@ RUN pip3 --no-cache-dir install setuptools && \
     pip3 --no-cache-dir install wheel && \
     pip3 install config && \
     pip3 install -r requirements.txt && \
-    pip3 install git+https://github.com/matterport/Mask_RCNN.git
 
 CMD echo $API_KEY
 

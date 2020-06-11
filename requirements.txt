@@ -14,3 +14,4 @@ scikit-image
 scipy
 tensorflow==1.13.1
 IPython[all]
+git+https://github.com/matterport/Mask_RCNN.git
