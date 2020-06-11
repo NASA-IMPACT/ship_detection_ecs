@@ -1,4 +1,5 @@
 import numpy as np
+import mrcnn.model as modellib
 
 from config import (
     UPSAMPLE_MODE,
@@ -7,8 +8,12 @@ from config import (
     EDGE_CROP,
     IMG_SIZE
 )
-
+from mrcnn import utils
+from mrcnn import visualize
+from mrcnn.config import Config
+from mrcnn.model import log
 from tensorflow.keras import models, layers
+
 
 # Build U-Net model
 def upsample_conv(filters, kernel_size, strides, padding):
@@ -90,11 +95,6 @@ def load_from_path(weight_file_path):
 
 
 def make_model_rcnn():
-    from mrcnn.config import Config
-    from mrcnn import utils
-    import mrcnn.model as modellib
-    from mrcnn import visualize
-    from mrcnn.model import log
 
     model_path = '../weights/mask_rcnn_airbus_0022.h5'
 
@@ -135,7 +135,6 @@ def make_model_rcnn():
         IMAGES_PER_GPU = 1
 
     import tensorflow as tf
-    #tf.config.experimental.set_visible_devices([], 'GPU')
     inference_config = InferenceConfig()
 
     # Recreate the model in inference mode
