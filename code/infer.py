@@ -98,6 +98,7 @@ class Infer:
                   )
                 images.append(img)
             else:
+                # this will be printed in the cloudwatch log.
                 print(f"{tile_url} not reachable, with error({status_code})")
         return np.asarray(images)
 
