@@ -63,8 +63,8 @@ class Infer:
             for item in items:
                 print(f"id: {item['id']}")
                 images = self.prepare_dataset(item['tiles'], item['id'])
-                predictions = self.model.predict((images / 255.))
                 if len(images) > 0:
+                    predictions = self.model.predict((images / 255.))
                     colms, rows = [elem[1] - elem[0] for elem in item['tiles']]
                     predictions = predictions.reshape(
                         (rows, colms, IMG_SIZE, IMG_SIZE)
