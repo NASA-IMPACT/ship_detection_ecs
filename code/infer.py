@@ -32,6 +32,8 @@ GEOJSON_TEMPLATE = {
     }
 }
 
+SITE_URL = 'https://8ib71h0627.execute-api.us-east-1.amazonaws.com/v1/sites'
+
 # had to do this because of how we are running the script
 WEIGHT_FILE = '../weights/iou_model.hdf5'
 WMTS_URL = f"https://tiles1.planet.com/data/v1/PSScene3Band/{{}}/{ZOOM_LEVEL}/{{}}/{{}}.png?api_key={{}}"
@@ -55,7 +57,7 @@ class Infer:
 
     def extents(self):
         if not(self._extents):
-            site_response = requests.get('https://8ib71h0627.execute-api.us-east-1.amazonaws.com/v1/sites')
+            site_response = requests.get(SITE_URL)
             sites = json.loads(site_response.text)['sites']
             self._extents = {}
             for site in sites:
