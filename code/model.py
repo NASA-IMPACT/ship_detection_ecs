@@ -96,7 +96,7 @@ def load_from_path(weight_file_path):
 
 def make_model_rcnn():
 
-    model_path = '../weights/mask_rcnn_airbus_0022.h5'
+    model_path = '/ship_detection/weights/mask_rcnn_airbus_0022.h5'
 
     class DetectorConfig(Config):
         # Give the configuration a recognizable name
