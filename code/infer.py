@@ -82,16 +82,23 @@ class Infer:
         images = list()
         for x_index in list(range(*x_indices)):
           for y_index in list(range(*y_indices)):
-            response = requests.get(
-              WMTS_URL.format(tile_id, x_index, y_index, self.credential)
+            tile_url = WMTS_URL.format(
+                tile_id,
+                x_index,
+                y_index,
+                self.credential
             )
-            response.raise_for_status()
-            img = np.asarray(
-              Image.open(BytesIO(response.content)).resize(
-                  (IMG_SIZE, IMG_SIZE)
-                ).convert('RGB')
-              )
-            images.append(img)
+            response = requests.get(tile_url)
+            status_code = response.status_code
+            if status_code == 200:
+                img = np.asarray(
+                  Image.open(BytesIO(response.content)).resize(
+                      (IMG_SIZE, IMG_SIZE)
+                    ).convert('RGB')
+                  )
+                images.append(img)
+            else:
+                print(f"{tile_url} not reachable, with error({status_code})")
         return np.asarray(images)
 
 
