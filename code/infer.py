@@ -35,7 +35,7 @@ GEOJSON_TEMPLATE = {
 SITE_URL = 'https://8ib71h0627.execute-api.us-east-1.amazonaws.com/v1/sites'
 
 # had to do this because of how we are running the script
-WEIGHT_FILE = '../weights/iou_model.hdf5'
+WEIGHT_FILE = '/ship_detection/weights/iou_model.hdf5'
 WMTS_URL = f"https://tiles1.planet.com/data/v1/PSScene3Band/{{}}/{ZOOM_LEVEL}/{{}}/{{}}.png?api_key={{}}"
 
 class Infer:
