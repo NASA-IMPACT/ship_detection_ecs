@@ -64,17 +64,18 @@ class Infer:
                 print(f"id: {item['id']}")
                 images = self.prepare_dataset(item['tiles'], item['id'])
                 predictions = self.model.predict((images / 255.))
-                columns, rows = [elem[1] - elem[0] for elem in item['tiles']]
-                predictions = predictions.reshape(
-                    (rows, columns, IMG_SIZE, IMG_SIZE)
-                )
-                images = images.reshape(
-                    (rows, columns, IMG_SIZE, IMG_SIZE, 3)
-                )
-                polygons = self.xy_to_latlon(
-                    predictions, images, rows, columns, item['coordinates']
-                )
-                detections.extend(polygons)
+                if len(images) > 0:
+                    colms, rows = [elem[1] - elem[0] for elem in item['tiles']]
+                    predictions = predictions.reshape(
+                        (rows, colms, IMG_SIZE, IMG_SIZE)
+                    )
+                    images = images.reshape(
+                        (rows, colms, IMG_SIZE, IMG_SIZE, 3)
+                    )
+                    polygons = self.xy_to_latlon(
+                        predictions, images, rows, colms, item['coordinates']
+                    )
+                    detections.extend(polygons)
         return { 'type': 'FeatureCollection', 'features': detections }
 
     def prepare_dataset(self, tile_range, tile_id):
