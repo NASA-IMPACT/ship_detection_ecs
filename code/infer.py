@@ -56,12 +56,14 @@ class Infer:
     def infer(self, date):
         self.start_date_time, self.end_date_time = self.prepare_date(date)
         detections = list()
+        scene_ids = list()
         for location, extent  in EXTENTS.items():
             items = self.planet_downloader.search_ids(
                 extent, self.start_date_time, self.end_date_time
             )
             for item in items:
                 print(f"id: {item['id']}")
+                scene_ids.append(item['id'])
                 images = self.prepare_dataset(item['tiles'], item['id'])
                 if len(images) > 0:
                     predictions = self.model.predict((images / 255.))
@@ -76,7 +78,8 @@ class Infer:
                         predictions, images, rows, colms, item['coordinates']
                     )
                     detections.extend(polygons)
-        return { 'type': 'FeatureCollection', 'features': detections }
+        detection_dict = { 'type': 'FeatureCollection', 'features': detections }
+        return [scene_ids, detection_dict]
 
     def prepare_dataset(self, tile_range, tile_id):
         x_indices, y_indices = tile_range
