@@ -32,6 +32,8 @@ GEOJSON_TEMPLATE = {
     }
 }
 
+SITE_URL = 'https://8ib71h0627.execute-api.us-east-1.amazonaws.com/v1/sites'
+
 # had to do this because of how we are running the script
 WEIGHT_FILE = '/ship_detection/weights/iou_model.hdf5'
 WMTS_URL = f"https://tiles1.planet.com/data/v1/PSScene3Band/{{}}/{ZOOM_LEVEL}/{{}}/{{}}.png?api_key={{}}"
@@ -43,6 +45,7 @@ class Infer:
         self.model = self.prepare_model()
         self.credential = credential
         self.planet_downloader = PlanetDownloader(credential)
+        self._extents = None
 
 
     def prepare_date(self, date):
@@ -52,12 +55,21 @@ class Infer:
     def prepare_model(self):
         return load_from_path(self.weight_path)
 
+    def extents(self):
+        if not(self._extents):
+            site_response = requests.get(SITE_URL)
+            sites = json.loads(site_response.text)['sites']
+            self._extents = {}
+            for site in sites:
+                self._extents[site['label']] = site['bounding_box']
+        return self._extents
 
-    def infer(self, date):
+    def infer(self, date, extent=None):
         self.start_date_time, self.end_date_time = self.prepare_date(date)
         detections = list()
         scene_ids = list()
-        for location, extent  in EXTENTS.items():
+        extents = extent or self.extents()
+        for location, extent in self.extents().items():
             items = self.planet_downloader.search_ids(
                 extent, self.start_date_time, self.end_date_time
             )
