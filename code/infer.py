@@ -56,18 +56,21 @@ class Infer:
         return load_from_path(self.weight_path)
 
     def extents(self):
-        if not(self._extents):
+        if not self._extents:
             site_response = requests.get(SITE_URL)
-            sites = json.loads(site_response.text)['sites']
-            self._extents = {}
-            for site in sites:
-                self._extents[site['label']] = site['bounding_box']
+            if site_response.status_code == 200:
+                sites = json.loads(site_response.text)['sites']
+                self._extents = {}
+            else:
+                sites = CACHE_SITES
+        for site in sites:
+            self._extents[site['label']] = site['bounding_box']
         return self._extents
 
-    def infer(self, date, extent=None):
+    def infer(self, date, extents=None):
         self.start_date_time, self.end_date_time = self.prepare_date(date)
         detections = list()
-        extents = extent or self.extents()
+        extents = extents or self.extents()
         for location, extent in self.extents().items():
             items = self.planet_downloader.search_ids(
                 extent, self.start_date_time, self.end_date_time
