@@ -109,21 +109,10 @@ class Infer:
         rows, colms, _, _ = np.where(grid_list >= THRESHOLD)
         for row, col in set(zip(rows, colms)):
             segments = (grid_list[row][col] > THRESHOLD).astype('uint8')
-            # keeping this for when we need to save images.
-            # img = Image.fromarray(images[row][col])
-            # draw = ImageDraw.Draw(img)
             for idx, ship in enumerate(regionprops(segments)):
                 bbox = ship.bbox
                 xs = bbox[::2]
                 ys = bbox[1::2]
-                # draw.rectangle(
-                #     [
-                #         (xs[0], ys[0]),
-                #         (xs[1], ys[1])
-                #     ],
-                #     fill ='#ffff33',
-                #     outline ='red'
-                # )
                 lons, lats = rasterio.transform.xy(
                     transform, (col * TILE_SIZE) + xs, (row * TILE_SIZE) + ys
                 )
@@ -133,5 +122,4 @@ class Infer:
                 polygon_coordinates.append(
                     self.prepare_geojson(reformated_bbox)
                 )
-            # img.save(f"{row}_{col}.png")
         return polygon_coordinates
