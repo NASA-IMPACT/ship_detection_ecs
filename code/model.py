@@ -1,5 +1,6 @@
 import numpy as np
 import mrcnn.model as modellib
+import tensorflow as tf
 
 from config import (
     UPSAMPLE_MODE,
@@ -14,7 +15,7 @@ from mrcnn.config import Config
 from mrcnn.model import log
 from tensorflow.keras import models, layers
 
-
+MODEL_PATH = '/ship_detection/weights/mask_rcnn_airbus_0022.h5'
 # Build U-Net model
 def upsample_conv(filters, kernel_size, strides, padding):
     return layers.Conv2DTranspose(filters, kernel_size, strides=strides, padding=padding)
@@ -96,8 +97,6 @@ def load_from_path(weight_file_path):
 
 def make_model_rcnn():
 
-    model_path = '/ship_detection/weights/mask_rcnn_airbus_0022.h5'
-
     class DetectorConfig(Config):
         # Give the configuration a recognizable name
         NAME = 'airbus'
@@ -134,23 +133,22 @@ def make_model_rcnn():
         GPU_COUNT = 1
         IMAGES_PER_GPU = 1
 
-    import tensorflow as tf
     inference_config = InferenceConfig()
 
     # Recreate the model in inference mode
     model = modellib.MaskRCNN(mode='inference',
                               config=inference_config,
                               model_dir='../data/')
-    model.load_weights(model_path, by_name=True)
+    model.load_weights(MODEL_PATH, by_name=True)
 
     return model
 
 
 def predict_rcnn(model, img):
 
-    prediction = model.detect([img])
+    prediction = model.detect(img)
     mask =  prediction[0]['masks']
+    zero_masks = np.zeros((*mask.shape[:2], 1))
     if mask.shape[2] == 0:
-        return np.zeros((*mask.shape[:2], 1))
-    else:
-        return mask * 255
+        mask = zero_masks
+    return mask * 255
