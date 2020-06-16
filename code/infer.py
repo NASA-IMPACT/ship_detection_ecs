@@ -5,6 +5,7 @@ import numpy as np
 import rasterio
 
 from config import (
+    CACHE_SITES,
     EXTENTS,
     IMG_SIZE,
     THRESHOLD,
@@ -70,6 +71,7 @@ class Infer:
     def infer(self, date, extents=None):
         self.start_date_time, self.end_date_time = self.prepare_date(date)
         detections = list()
+        scene_ids = list()
         extents = extents or self.extents()
         for location, extent in self.extents().items():
             items = self.planet_downloader.search_ids(
@@ -77,36 +79,47 @@ class Infer:
             )
             for item in items:
                 print(f"id: {item['id']}")
+                scene_ids.append(item['id'])
                 images = self.prepare_dataset(item['tiles'], item['id'])
-                predictions = self.model.predict((images / 255.))
-                columns, rows = [elem[1] - elem[0] for elem in item['tiles']]
-                predictions = predictions.reshape(
-                    (rows, columns, IMG_SIZE, IMG_SIZE)
-                )
-                images = images.reshape(
-                    (rows, columns, IMG_SIZE, IMG_SIZE, 3)
-                )
-                polygons = self.xy_to_latlon(
-                    predictions, images, rows, columns, item['coordinates']
-                )
-                detections.extend(polygons)
-        return { 'type': 'FeatureCollection', 'features': detections }
+                if len(images) > 0:
+                    predictions = self.model.predict((images / 255.))
+                    colms, rows = [elem[1] - elem[0] for elem in item['tiles']]
+                    predictions = predictions.reshape(
+                        (rows, colms, IMG_SIZE, IMG_SIZE)
+                    )
+                    images = images.reshape(
+                        (rows, colms, IMG_SIZE, IMG_SIZE, 3)
+                    )
+                    polygons = self.xy_to_latlon(
+                        predictions, images, rows, colms, item['coordinates']
+                    )
+                    detections.extend(polygons)
+        detection_dict = { 'type': 'FeatureCollection', 'features': detections }
+        return [scene_ids, detection_dict]
 
     def prepare_dataset(self, tile_range, tile_id):
         x_indices, y_indices = tile_range
         images = list()
         for x_index in list(range(*x_indices)):
           for y_index in list(range(*y_indices)):
-            response = requests.get(
-              WMTS_URL.format(tile_id, x_index, y_index, self.credential)
+            tile_url = WMTS_URL.format(
+                tile_id,
+                x_index,
+                y_index,
+                self.credential
             )
-            response.raise_for_status()
-            img = np.asarray(
-              Image.open(BytesIO(response.content)).resize(
-                  (IMG_SIZE, IMG_SIZE)
-                ).convert('RGB')
-              )
-            images.append(img)
+            response = requests.get(tile_url)
+            status_code = response.status_code
+            if status_code == 200:
+                img = np.asarray(
+                  Image.open(BytesIO(response.content)).resize(
+                      (IMG_SIZE, IMG_SIZE)
+                    ).convert('RGB')
+                  )
+                images.append(img)
+            else:
+                # this will be printed in the cloudwatch log.
+                print(f"{tile_url} not reachable, with error({status_code})")
         return np.asarray(images)
 
 
