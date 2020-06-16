@@ -45,8 +45,8 @@ while True:
             date = json.loads(message_body).get('date')
             if not(date):
                 continue
-            scene_ids, detections = infer.infer(date)
-            print(f"{date}: number of detections: {len(detections['features'])}")
+            scene_ids, detections, detection_count = infer.infer(date)
+            print(f"{date}: number of detections: {detection_count}")
             detections = {
                 'date': date,
                 'detections': detections,
