@@ -57,6 +57,7 @@ class Infer:
     def prepare_model(self):
         return load_from_path(self.weight_path)
 
+
     def extents(self):
         if not self._extents:
             site_response = requests.get(SITE_URL)
@@ -68,6 +69,7 @@ class Infer:
             for site in sites:
                 self._extents[site['label']] = site['bounding_box']
         return self._extents
+
 
     def infer(self, date, extents=None):
         self.start_date_time, self.end_date_time = self.prepare_date(date)
@@ -81,47 +83,41 @@ class Infer:
             for item in items:
                 print(f"id: {item['id']}")
                 scene_ids.append(item['id'])
-                images = self.prepare_dataset(item['tiles'], item['id'])
-                if len(images) > 0:
-                    predictions = self.model.predict((images / 255.))
-                    colms, rows = [elem[1] - elem[0] for elem in item['tiles']]
-                    predictions = predictions.reshape(
-                        (rows, colms, IMG_SIZE, IMG_SIZE)
-                    )
-                    images = images.reshape(
-                        (rows, colms, IMG_SIZE, IMG_SIZE, 3)
-                    )
-                    polygons = self.xy_to_latlon(
-                        predictions, images, rows, colms, item['coordinates']
-                    )
-                    detections.extend(polygons)
+                predictions = list()
+                for imgs in self.prepare_dataset(item['tiles'], item['id']):
+                    predictions.append(self.model.predict((imgs / 255.))[0])
+                predictions = np.asarray(predictions)
+                columns, rows = [elem[1] - elem[0] for elem in item['tiles']]
+                predictions = predictions.reshape(
+                    (rows, columns, IMG_SIZE, IMG_SIZE)
+                )
+                polygons = self.xy_to_latlon(
+                    predictions, rows, columns, item['coordinates']
+                )
+                detections.extend(polygons)
         detection_dict = { 'type': 'FeatureCollection', 'features': detections }
         return (scene_ids, detection_dict)
 
+
     def prepare_dataset(self, tile_range, tile_id):
         x_indices, y_indices = tile_range
-        images = list()
         for x_index in list(range(*x_indices)):
-          for y_index in list(range(*y_indices)):
-            tile_url = WMTS_URL.format(
-                tile_id,
-                x_index,
-                y_index,
-                self.credential
-            )
-            response = requests.get(tile_url)
-            status_code = response.status_code
-            if status_code == 200:
-                img = np.asarray(
-                  Image.open(BytesIO(response.content)).resize(
-                      (IMG_SIZE, IMG_SIZE)
-                    ).convert('RGB')
-                  )
-                images.append(img)
-            else:
-                # this will be printed in the cloudwatch log.
-                print(f"{tile_url} not reachable, with error({status_code})")
-        return np.asarray(images)
+            for y_index in list(range(*y_indices)):
+                tile_url = WMTS_URL.format(
+                    tile_id,
+                    x_index,
+                    y_index,
+                    self.credential
+                )
+                response = requests.get(tile_url)
+                status_code = response.status_code
+                if status_code == 200:
+                    img = np.asarray(
+                      Image.open(BytesIO(response.content)).resize(
+                          (IMG_SIZE, IMG_SIZE)
+                        ).convert('RGB')
+                      )
+                    yield np.asarray([img])
 
 
     def prepare_geojson(self, coordinates):
@@ -130,7 +126,7 @@ class Infer:
         return geojson
 
 
-    def xy_to_latlon(self, grid_list, images, rows, cols, bounds):
+    def xy_to_latlon(self, grid_list, rows, cols, bounds):
         transform = rasterio.transform.from_bounds(
             *bounds, TILE_SIZE * cols, TILE_SIZE * rows
         )
@@ -138,21 +134,10 @@ class Infer:
         rows, colms, _, _ = np.where(grid_list >= THRESHOLD)
         for row, col in set(zip(rows, colms)):
             segments = (grid_list[row][col] > THRESHOLD).astype('uint8')
-            # keeping this for when we need to save images.
-            # img = Image.fromarray(images[row][col])
-            # draw = ImageDraw.Draw(img)
             for idx, ship in enumerate(regionprops(segments)):
                 bbox = ship.bbox
                 xs = bbox[::2]
                 ys = bbox[1::2]
-                # draw.rectangle(
-                #     [
-                #         (xs[0], ys[0]),
-                #         (xs[1], ys[1])
-                #     ],
-                #     fill ='#ffff33',
-                #     outline ='red'
-                # )
                 lons, lats = rasterio.transform.xy(
                     transform, (col * TILE_SIZE) + xs, (row * TILE_SIZE) + ys
                 )
@@ -162,5 +147,4 @@ class Infer:
                 polygon_coordinates.append(
                     self.prepare_geojson(reformated_bbox)
                 )
-            # img.save(f"{row}_{col}.png")
         return polygon_coordinates
