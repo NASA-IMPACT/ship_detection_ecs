@@ -55,6 +55,7 @@ class Infer:
     def prepare_model(self):
         return load_from_path(self.weight_path)
 
+
     def extents(self):
         if not self._extents:
             site_response = requests.get(SITE_URL)
@@ -66,6 +67,7 @@ class Infer:
             for site in sites:
                 self._extents[site['label']] = site['bounding_box']
         return self._extents
+
 
     def infer(self, date, extents=None):
         self.start_date_time, self.end_date_time = self.prepare_date(date)
@@ -80,6 +82,7 @@ class Infer:
                 print(f"id: {item['id']}")
                 scene_ids.append(item['id'])
                 images = self.prepare_dataset(item['tiles'], item['id'])
+                predictions = list()
                 for image in images:
                     predictions.append(predict_rcnn(self.model, image))
                 predictions = np.asarray(predictions)
@@ -98,7 +101,6 @@ class Infer:
 
     def prepare_dataset(self, tile_range, tile_id):
         x_indices, y_indices = tile_range
-        images = list()
         for x_index in list(range(*x_indices)):
             for y_index in list(range(*y_indices)):
                 tile_url = WMTS_URL.format(
@@ -115,16 +117,14 @@ class Infer:
                           (IMG_SIZE, IMG_SIZE)
                         ).convert('RGB')
                       )
-                    images.append(img)
-                else:
-                    # this will be printed in the cloudwatch log.
-                    print(f"{tile_url} not reachable, with error({status_code})")
-        return np.asarray(images)
+                    yield np.asarray([img])
+
 
     def prepare_geojson(self, coordinates):
         geojson = deepcopy(GEOJSON_TEMPLATE)
         geojson['geometry']['coordinates'] = coordinates
         return geojson
+
 
     def xy_to_latlon(self, grid_list, rows, cols, bounds):
         transform = rasterio.transform.from_bounds(
