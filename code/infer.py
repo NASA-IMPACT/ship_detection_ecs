@@ -21,6 +21,7 @@ from PIL import (
     Image,
     ImageDraw
 )
+
 from planet_downloader import PlanetDownloader
 from skimage.measure import regionprops
 
@@ -59,13 +60,13 @@ class Infer:
     def extents(self):
         if not self._extents:
             site_response = requests.get(SITE_URL)
+            self._extents = {}
             if site_response.status_code == 200:
                 sites = json.loads(site_response.text)['sites']
-                self._extents = {}
             else:
                 sites = CACHE_SITES
-        for site in sites:
-            self._extents[site['label']] = site['bounding_box']
+            for site in sites:
+                self._extents[site['label']] = site['bounding_box']
         return self._extents
 
     def infer(self, date, extents=None):
