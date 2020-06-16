@@ -45,12 +45,11 @@ while True:
             date = json.loads(message_body).get('date')
             if not(date):
                 continue
-            scene_ids, detections, detection_count = infer.infer(date)
+            location_wise_detections, detection_count = infer.infer(date)
             print(f"{date}: number of detections: {detection_count}")
             detections = {
                 'date': date,
-                'detections': detections,
-                'scene_ids': scene_ids
+                'detections': location_wise_detections
             }
             sqs_connector.send_message(
                 QueueUrl=detected_queue_url,
