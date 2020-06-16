@@ -5,6 +5,7 @@ import numpy as np
 import rasterio
 
 from config import (
+    CACHE_SITES,
     EXTENTS,
     IMG_SIZE,
     THRESHOLD,
