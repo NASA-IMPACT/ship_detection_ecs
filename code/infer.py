@@ -71,10 +71,14 @@ class Infer:
 
     def infer(self, date, extents=None):
         self.start_date_time, self.end_date_time = self.prepare_date(date)
-        detections = list()
+        detection_dict = {}
         scene_ids = list()
-        extents = extents or self.extents()
+        # saving this method call for when we are ready to do other locations
+        # currently only running for sanfran, LA, and NY
+        extents = CACHE_SITES # extents or self.extents()
+        detection_count = 0
         for location, extent in self.extents().items():
+            detections = list()
             items = self.planet_downloader.search_ids(
                 extent, self.start_date_time, self.end_date_time
             )
@@ -93,10 +97,15 @@ class Infer:
                 polygons = self.xy_to_latlon(
                     predictions, rows, columns, item['coordinates']
                 )
+                detection_count += len(polygons)
                 detections.extend(polygons)
-        detection_dict = { 'type': 'FeatureCollection', 'features': detections }
 
-        return (scene_ids, detection_dict)
+            detection_dict[location] = {
+                'type': 'FeatureCollection',
+                'features': detections
+            }
+
+        return (scene_ids, detection_dict, detection_count)
 
 
     def prepare_dataset(self, tile_range, tile_id):
