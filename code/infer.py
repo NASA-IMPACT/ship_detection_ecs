@@ -96,7 +96,7 @@ class Infer:
                     )
                     detections.extend(polygons)
         detection_dict = { 'type': 'FeatureCollection', 'features': detections }
-        return [scene_ids, detection_dict]
+        return (scene_ids, detection_dict)
 
     def prepare_dataset(self, tile_range, tile_id):
         x_indices, y_indices = tile_range
