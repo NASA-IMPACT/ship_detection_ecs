@@ -29,8 +29,6 @@ ENV API_KEY $API_KEY
 RUN pip3 --no-cache-dir install setuptools && \
     pip3 --no-cache-dir install wheel && \
     pip3 install config && \
-    pip3 install -r requirements.txt && \
-
-CMD echo $API_KEY
+    pip3 install -r requirements.txt
 
 ENTRYPOINT python3 /ship_detection/code/message_consumer.py
