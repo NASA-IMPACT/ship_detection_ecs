@@ -120,9 +120,10 @@ class Infer:
                     yield np.asarray([img])
 
 
-    def prepare_geojson(self, coordinates):
+    def prepare_geojson(self, coordinates, area):
         geojson = deepcopy(GEOJSON_TEMPLATE)
         geojson['geometry']['coordinates'] = coordinates
+        geojson['properties']['area'] = area
         return geojson
 
 
@@ -138,6 +139,7 @@ class Infer:
                 bbox = ship.bbox
                 xs = bbox[::2]
                 ys = bbox[1::2]
+                area = abs(xs[0] - xs[1]) * abs(ys[0] - ys[1])
                 lons, lats = rasterio.transform.xy(
                     transform, (col * TILE_SIZE) + xs, (row * TILE_SIZE) + ys
                 )
@@ -145,6 +147,6 @@ class Infer:
                     [lons[0], lats[0], lons[1], lats[1]]
                 )
                 polygon_coordinates.append(
-                    self.prepare_geojson(reformated_bbox)
+                    self.prepare_geojson(reformated_bbox, area)
                 )
         return polygon_coordinates
