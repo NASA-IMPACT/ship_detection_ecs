@@ -74,16 +74,18 @@ class Infer:
         location_wise_detections = []
         # saving this method call for when we are ready to do other locations
         # currently only running for sanfran, LA, and NY
-        extents = CACHE_SITES # extents or self.extents()
+        extents = extents or CACHE_SITES # extents or self.extents()
         detection_count = 0
-        for location, extent in self.extents().items():
+        for extent in extents:
+            location = extent['label']
             detections = list()
             scene_ids = list()
             items = self.planet_downloader.search_ids(
-                extent, self.start_date_time, self.end_date_time
+                extent['bounding_box'], self.start_date_time, self.end_date_time
             )
+            print(f"Total scenes: {len(items)}")
             for item in items:
-                print(f"id: {item['id']}")
+                print(f"id: {item['id']}, tile range: {item['tiles']}")
                 scene_ids.append(item['id'])
                 images = self.prepare_dataset(item['tiles'], item['id'])
                 predictions = list()
