@@ -116,6 +116,7 @@ class Infer:
 
     def prepare_dataset(self, tile_range, tile_id):
         x_indices, y_indices = tile_range
+        images = list()
         for x_index in list(range(*x_indices)):
             for y_index in list(range(*y_indices)):
                 tile_url = WMTS_URL.format(
@@ -132,7 +133,8 @@ class Infer:
                           (IMG_SIZE, IMG_SIZE)
                         ).convert('RGB')
                       )
-                    yield np.asarray([img])
+                images.append(img)
+        return images
 
 
     def prepare_geojson(self, coordinates, area):

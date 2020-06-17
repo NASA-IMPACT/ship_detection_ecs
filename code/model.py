@@ -146,8 +146,8 @@ def make_model_rcnn():
 
 
 def predict_rcnn(model, img):
-    prediction = model.detect([img])
-    mask =  prediction[0]['masks']
+    prediction = model.detect(img)
+    mask = prediction[0]['masks']
     zero_masks = np.zeros((*mask.shape[:2], 1))
     if mask.shape[2] == 0:
         mask = zero_masks
