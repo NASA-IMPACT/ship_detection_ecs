@@ -111,7 +111,7 @@ class Infer:
                 'scene_ids': scene_ids
             })
 
-        return (location_wise_detections, detection_count)
+        return location_wise_detections, detection_count
 
 
     def prepare_dataset(self, tile_range, tile_id):
