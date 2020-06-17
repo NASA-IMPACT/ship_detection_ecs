@@ -3,12 +3,13 @@ import mrcnn.model as modellib
 import tensorflow as tf
 
 from config import (
-    UPSAMPLE_MODE,
-    NET_SCALING,
-    GAUSSIAN_NOISE,
     EDGE_CROP,
-    IMG_SIZE
+    GAUSSIAN_NOISE,
+    IMG_SIZE,
+    NET_SCALING,
+    UPSAMPLE_MODE
 )
+
 from mrcnn import utils
 from mrcnn import visualize
 from mrcnn.config import Config
@@ -145,10 +146,10 @@ def make_model_rcnn():
 
 
 def predict_rcnn(model, img):
-
-    prediction = model.detect(img)
+    prediction = model.detect([img])
     mask =  prediction[0]['masks']
     zero_masks = np.zeros((*mask.shape[:2], 1))
     if mask.shape[2] == 0:
         mask = zero_masks
+    mask = np.squeeze(mask)
     return mask * 255
