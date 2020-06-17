@@ -53,7 +53,7 @@ THRESHOLD = 0.5
 TILE_SIZE = 256
 UPSAMPLE_MODE = 'SIMPLE'
 WEIGHT_FILE = '../weights/iou_model.hdf5'
-ZOOM_LEVEL = 16  # 16 is in pixel resolution == 2.4m
+ZOOM_LEVEL = 14  # 16 is in pixel resolution == 2.4m
 
 WMTS_URL = f"https://tiles1.planet.com/data/v1/PSScene3Band/{{}}/{ZOOM_LEVEL}/{{}}/{{}}.png?api_key={{}}"
 
