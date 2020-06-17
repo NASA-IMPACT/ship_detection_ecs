@@ -40,13 +40,11 @@ while True:
     messages = detection_messages.get('Messages', [])
     # extract date information for message
     for msg in messages:
-        message_body = msg['Body']
-        if message_body is not None:
-            message = json.loads(message_body)
-            date = message.get('date')
-            extents = message.get('extents')
-            if not(date):
-                continue
+        message_body = msg['Body'] or '{}'
+        message = json.loads(message_body)
+        date = message.get('date')
+        extents = message.get('extents')
+        if date:
             location_wise_detections, detection_count = infer.infer(
                 date,
                 extents=extents
