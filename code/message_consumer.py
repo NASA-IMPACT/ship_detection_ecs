@@ -42,10 +42,15 @@ while True:
     for msg in messages:
         message_body = msg['Body']
         if message_body is not None:
-            date = json.loads(message_body).get('date')
+            message = json.loads(message_body)
+            date = message.get('date')
+            extents = message.get('extents')
             if not(date):
                 continue
-            location_wise_detections, detection_count = infer.infer(date)
+            location_wise_detections, detection_count = infer.infer(
+                date,
+                extents=extents
+            )
             print(f"{date}: number of detections: {detection_count}")
             detections = {
                 'date': date,
