@@ -96,7 +96,7 @@ def load_from_path(weight_file_path):
     return seg_model
 
 
-def make_model_rcnn():
+def make_model_rcnn(total_num_images):
 
     class DetectorConfig(Config):
         # Give the configuration a recognizable name
@@ -132,7 +132,7 @@ def make_model_rcnn():
 
     class InferenceConfig(DetectorConfig):
         GPU_COUNT = 1
-        IMAGES_PER_GPU = 1
+        IMAGES_PER_GPU = total_num_images
 
     inference_config = InferenceConfig()
 
@@ -145,11 +145,13 @@ def make_model_rcnn():
     return model
 
 
-def predict_rcnn(model, img):
-    prediction = model.detect([img])
-    mask = prediction[0]['masks']
-    zero_masks = np.zeros((*mask.shape[:2], 1))
-    if mask.shape[2] == 0:
-        mask = zero_masks
-    mask = np.sum(mask, axis=-1)
-    return mask * 255
+def predict_rcnn(model, images):
+    predictions = model.detect(images)
+    final_preds = list()
+    for pred in predictions:
+        mask = pred['masks']
+        zero_masks = np.zeros((*mask.shape[:2], 1))
+        if mask.shape[2] == 0:
+            mask = zero_masks
+        final_preds.append(np.sum(mask, axis=-1) * 255)
+    return final_preds

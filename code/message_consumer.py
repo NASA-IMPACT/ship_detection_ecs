@@ -54,13 +54,16 @@ while True:
                 'date': date,
                 'detections': location_wise_detections
             }
-            sqs_connector.send_message(
-                QueueUrl=detected_queue_url,
-                MessageBody=json.dumps(detections)
-            )
+            print(detections)
+            # sqs_connector.send_message(
+            #     QueueUrl=detected_queue_url,
+            #     MessageBody=json.dumps(detections)
+            # )
         else:
             print('Please specify date')
         # delete message from queue
+        session = assumed_role_session()
+        sqs_connector = session.client('sqs')
         sqs_connector.delete_message(
             QueueUrl=detection_queue_url,
             ReceiptHandle=msg['ReceiptHandle']

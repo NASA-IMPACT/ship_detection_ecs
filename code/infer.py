@@ -1,8 +1,10 @@
+import math
 import mercantile
 import json
 import requests
 import numpy as np
 import rasterio
+import tensorflow as tf
 
 from config import (
     CACHE_SITES,
@@ -34,6 +36,8 @@ GEOJSON_TEMPLATE = {
     }
 }
 
+IMGS_PER_GPU = 20
+
 SITE_URL = 'https://8ib71h0627.execute-api.us-east-1.amazonaws.com/v1/sites'
 
 # had to do this because of how we are running the script
@@ -44,10 +48,11 @@ class Infer:
 
     def __init__(self, weight_path=WEIGHT_FILE, credential=None):
         self.weight_path = weight_path
-        self.model = make_model_rcnn()
+        self.model = make_model_rcnn(IMGS_PER_GPU)
         self.credential = credential
         self.planet_downloader = PlanetDownloader(credential)
         self._extents = None
+        print('gpu available:', tf.test.is_gpu_available())
 
     def prepare_date(self, date):
         return [f"{date}T00:00:00Z", f"{date}T23:59:59Z"]
@@ -68,8 +73,24 @@ class Infer:
                 self._extents[site['label']] = site['bounding_box']
         return self._extents
 
+    def list_scenes(self, date):
+        self.start_date_time, self.end_date_time = self.prepare_date(date)
+        location_wise_detections = []
+        # saving this method call for when we are ready to do other locations
+        # currently only running for sanfran, LA, and NY
+        extents = extents or CACHE_SITES # extents or self.extents()
+        detection_count = 0
+        for extent in extents:
+            location = extent['label']
+            detections = list()
+            scene_ids = list()
+            items = self.planet_downloader.search_ids(
+                extent['bounding_box'], self.start_date_time, self.end_date_time
+            )
+            print(date, location, [item['id'] for item in items])
 
     def infer(self, date, extents=None):
+
         self.start_date_time, self.end_date_time = self.prepare_date(date)
         location_wise_detections = []
         # saving this method call for when we are ready to do other locations
@@ -87,10 +108,14 @@ class Infer:
             for item in items:
                 print(f"id: {item['id']}, tile range: {item['tiles']}")
                 scene_ids.append(item['id'])
-                images = self.prepare_dataset(item['tiles'], item['id'])
+                indices = self.prepare_indices(item['tiles'])
+                image_group = self.prepare_dataset(indices, item['id'])
                 predictions = list()
-                for image in images:
-                    predictions.append(predict_rcnn(self.model, image))
+                for index, imgs in enumerate(image_group):
+                    predictions += predict_rcnn(self.model, imgs)
+                    print(f'predicted: {index}')
+                del(image_group)
+                predictions = predictions[:len(indices)]
                 predictions = np.asarray(predictions)
                 columns, rows = [elem[1] - elem[0] for elem in item['tiles']]
                 predictions = predictions.reshape(
@@ -99,6 +124,9 @@ class Infer:
                 polygons = self.xy_to_latlon(
                     predictions, rows, columns, item['coordinates']
                 )
+                del(predictions)
+                del(indices)
+
                 detection_count += len(polygons)
                 detections.extend(polygons)
 
@@ -113,28 +141,47 @@ class Infer:
 
         return location_wise_detections, detection_count
 
+    def augment_indices(self, indices):
+        length = len(indices)
+        diff = math.ceil(length / IMGS_PER_GPU) * IMGS_PER_GPU - length
+        indices += indices[0:diff]
+        return indices
 
-    def prepare_dataset(self, tile_range, tile_id):
+    def prepare_indices(self, tile_range):
         x_indices, y_indices = tile_range
-        images = list()
+        indices = list()
         for x_index in list(range(*x_indices)):
             for y_index in list(range(*y_indices)):
-                tile_url = WMTS_URL.format(
-                    tile_id,
-                    x_index,
-                    y_index,
-                    self.credential
+                indices.append((x_index, y_index))
+        return indices
+
+    def prepare_dataset(self, indices, tile_id):
+
+        indices = self.augment_indices(indices)
+
+        images = list()
+        for x_index, y_index in indices:
+            tile_url = WMTS_URL.format(
+                tile_id,
+                x_index,
+                y_index,
+                self.credential
+             )
+            response = requests.get(tile_url)
+            status_code = response.status_code
+            if status_code == 200:
+                img = np.asarray(
+                    Image.open(BytesIO(response.content)).resize(
+                        (IMG_SIZE, IMG_SIZE)
+                    ).convert('RGB')
                 )
-                response = requests.get(tile_url)
-                status_code = response.status_code
-                if status_code == 200:
-                    img = np.asarray(
-                      Image.open(BytesIO(response.content)).resize(
-                          (IMG_SIZE, IMG_SIZE)
-                        ).convert('RGB')
-                      )
                 images.append(img)
-        return images
+            length = len(images)
+            if length == IMGS_PER_GPU:
+                yield images
+            elif length > IMGS_PER_GPU:
+                images = [images[-1]]
+
 
 
     def prepare_geojson(self, coordinates, area):

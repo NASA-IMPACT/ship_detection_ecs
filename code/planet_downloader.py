@@ -10,21 +10,28 @@ from config import ZOOM_LEVEL
 BODY = {
     "filter": {
         "type": "AndFilter",
-        "config": [ {
-          "type": "GeometryFilter",
-          "field_name": "geometry",
-          "config": {
-                "type": "Polygon",
-                "coordinates": []
+        "config": [{
+            "type": "GeometryFilter",
+            "field_name": "geometry",
+            "config": {
+                  "type": "Polygon",
+                  "coordinates": []
+               }
+        },
+        {
+            "type": "DateRangeFilter",
+            "field_name":"acquired",
+                "config":{
+                    "gt": "",
+                    "lte": ""
              }
         },
         {
-          "type": "DateRangeFilter",
-          "field_name":"acquired",
-            "config":{
-              "gt": "",
-              "lte": ""
-           }
+            "type": "RangeFilter",
+            "field_name": "cloud_cover",
+            "config": {
+                "lte": 0.5
+            }
         }]
     },
     "item_types": ["PSScene3Band"]
