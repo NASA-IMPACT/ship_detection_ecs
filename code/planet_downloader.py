@@ -64,14 +64,14 @@ class PlanetDownloader:
     def extract_data(self, parsed_data):
         extracted_data = []
         for feature in parsed_data:
-          current_data = { 'images': [] }
-          current_data['id'] = feature['id']
-          reverted_coordinates = self.revert_coordinates(
-            feature['geometry']['coordinates']
-          )
-          current_data['coordinates'] = reverted_coordinates
-          current_data['tiles'] = self.tile_indices(reverted_coordinates)
-          extracted_data.append(current_data)
+            current_data = { 'images': [] }
+            current_data['id'] = feature['id']
+            reverted_coordinates = self.revert_coordinates(
+                feature['geometry']['coordinates']
+            )
+            current_data['coordinates'] = reverted_coordinates
+            current_data['tiles'] = self.tile_indices(reverted_coordinates)
+            extracted_data.append(current_data)
         return extracted_data
 
 
