@@ -89,8 +89,14 @@ class Infer:
             )
             print(date, location, [item['id'] for item in items])
 
-    def infer(self, date, extents=None):
+    def calculate_geojson(self, preds, bounding_boxes):
+        geojsons = list()
+        for index, pred in preds:
+            geojsons.append(self.xy_to_latlon(pred, bounding_boxes[index]))
+        return geojsons
 
+    def infer(self, date, extents=None):
+        from PIL import Image
         self.start_date_time, self.end_date_time = self.prepare_date(date)
         location_wise_detections = []
         # saving this method call for when we are ready to do other locations
@@ -105,28 +111,32 @@ class Infer:
                 extent['bounding_box'], self.start_date_time, self.end_date_time
             )
             print(f"Total scenes: {len(items)}")
+            items = [items[-5]]
             for item in items:
                 print(f"id: {item['id']}, tile range: {item['tiles']}")
                 scene_ids.append(item['id'])
                 indices = self.prepare_indices(item['tiles'])
+                length = len(indices)
                 image_group = self.prepare_dataset(indices, item['id'])
+                print('total length:', length)
                 predictions = list()
-                for index, imgs in enumerate(image_group):
-                    predictions += predict_rcnn(self.model, imgs)
-                    print(f'predicted: {index}')
+                for index, (imgs, bounding_boxes) in enumerate(image_group):
+                    print(index)
+                    preds = predict_rcnn(self.model, imgs)
+                    predictions += self.calculate_geojson(preds, bounding_boxes)
+                    preds = []
                 del(image_group)
-                predictions = predictions[:len(indices)]
+                predictions = predictions[:length]
                 predictions = np.asarray(predictions)
                 columns, rows = [elem[1] - elem[0] for elem in item['tiles']]
                 predictions = predictions.reshape(
-                    (rows, columns, IMG_SIZE, IMG_SIZE)
+                    (columns, rows, IMG_SIZE, IMG_SIZE)
                 )
                 polygons = self.xy_to_latlon(
                     predictions, rows, columns, item['coordinates']
                 )
                 del(predictions)
                 del(indices)
-
                 detection_count += len(polygons)
                 detections.extend(polygons)
 
@@ -160,13 +170,14 @@ class Infer:
         indices = self.augment_indices(indices)
 
         images = list()
+        bounding_boxes = list()
         for x_index, y_index in indices:
             tile_url = WMTS_URL.format(
                 tile_id,
                 x_index,
                 y_index,
                 self.credential
-             )
+            )
             response = requests.get(tile_url)
             status_code = response.status_code
             if status_code == 200:
@@ -176,12 +187,18 @@ class Infer:
                     ).convert('RGB')
                 )
                 images.append(img)
+                boundnig_box = mercantile.bounds(x_index, y_index, ZOOM_LEVEL)
+                bounding_boxes.append([
+                    boundnig_box.west,
+                    boundnig_box.south,
+                    bounding_box.east,
+                    bounding_box.north
+                ])
             length = len(images)
             if length == IMGS_PER_GPU:
-                yield images
-            elif length > IMGS_PER_GPU:
-                images = [images[-1]]
-
+                yield images, bounding_boxes
+                images = []
+                bounding_boxes = []
 
 
     def prepare_geojson(self, coordinates, area):
@@ -191,26 +208,24 @@ class Infer:
         return geojson
 
 
-    def xy_to_latlon(self, grid_list, rows, cols, bounds):
+    def xy_to_latlon(self, prediction, bounding_box):
         transform = rasterio.transform.from_bounds(
-            *bounds, TILE_SIZE * cols, TILE_SIZE * rows
+            *bounds, IMG_SIZE, IMG_SIZE
         )
         polygon_coordinates = list()
-        rows, colms, _, _ = np.where(grid_list >= THRESHOLD)
-        for row, col in set(zip(rows, colms)):
-            segments = (grid_list[row][col] > THRESHOLD).astype('uint8')
-            for idx, ship in enumerate(regionprops(segments)):
-                bbox = ship.bbox
-                xs = bbox[::2]
-                ys = bbox[1::2]
-                area = abs(xs[0] - xs[1]) * abs(ys[0] - ys[1])
-                lons, lats = rasterio.transform.xy(
-                    transform, (col * TILE_SIZE) + xs, (row * TILE_SIZE) + ys
-                )
-                reformated_bbox = self.planet_downloader.prepare_coordinates(
-                    [lons[0], lats[0], lons[1], lats[1]]
-                )
-                polygon_coordinates.append(
-                    self.prepare_geojson(reformated_bbox, area)
-                )
+        segments = (prediction > THRESHOLD).astype('uint8')
+        for idx, ship in enumerate(regionprops(segments)):
+            bbox = ship.bbox
+            xs = bbox[::2]
+            ys = bbox[1::2]
+            area = abs(xs[0] - xs[1]) * abs(ys[0] - ys[1])
+            lons, lats = rasterio.transform.xy(
+                transform, IMG_SIZE, IMG_SIZE
+            )
+            reformated_bbox = self.planet_downloader.prepare_coordinates(
+                [lons[0], lats[0], lons[1], lats[1]]
+            )
+            polygon_coordinates.append(
+                self.prepare_geojson(reformated_bbox, area)
+            )
         return polygon_coordinates
