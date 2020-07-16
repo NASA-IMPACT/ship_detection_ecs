@@ -16,7 +16,7 @@ from mrcnn.config import Config
 from mrcnn.model import log
 from tensorflow.keras import models, layers
 
-MODEL_PATH = '/ship_detection/weights/mask_rcnn_airbus_0022.h5'
+MODEL_PATH = '../weights/mask_rcnn_airbus_0022.h5'
 # Build U-Net model
 def upsample_conv(filters, kernel_size, strides, padding):
     return layers.Conv2DTranspose(filters, kernel_size, strides=strides, padding=padding)
@@ -148,10 +148,15 @@ def make_model_rcnn(total_num_images):
 def predict_rcnn(model, images):
     predictions = model.detect(images)
     final_preds = list()
-    for pred in predictions:
-        mask = pred['masks']
-        zero_masks = np.zeros((*mask.shape[:2], 1))
-        if mask.shape[2] == 0:
-            mask = zero_masks
-        final_preds.append(np.sum(mask, axis=-1) * 255)
+    for pred in (predictions):
+        masks = pred['masks']
+        zero_masks = np.zeros((*masks.shape[:2], 1))
+        if masks.shape[2] == 0:
+            masks = zero_masks
+        masks = np.moveaxis(masks, -1, 0)
+        local_final_preds = zero_masks[:,:,0]
+        for index, mask in enumerate(masks, 1):
+            local_final_preds = np.add(local_final_preds, mask * index)
+        final_preds.append(local_final_preds)
     return final_preds
+
