@@ -41,7 +41,7 @@ IMGS_PER_GPU = 20
 SITE_URL = 'https://8ib71h0627.execute-api.us-east-1.amazonaws.com/v1/sites'
 
 # had to do this because of how we are running the script
-WEIGHT_FILE = '/ship_detection/weights/iou_model.hdf5'
+WEIGHT_FILE = '../weights/iou_model.hdf5'
 WMTS_URL = f"https://tiles1.planet.com/data/v1/PSScene3Band/{{}}/{ZOOM_LEVEL}/{{}}/{{}}.png?api_key={{}}"
 
 class Infer:
@@ -91,12 +91,11 @@ class Infer:
 
     def calculate_geojson(self, preds, bounding_boxes):
         geojsons = list()
-        for index, pred in preds:
-            geojsons.append(self.xy_to_latlon(pred, bounding_boxes[index]))
+        for index, pred in enumerate(preds):
+            geojsons.extend(self.xy_to_latlon(np.asarray(pred), bounding_boxes[index]))
         return geojsons
 
     def infer(self, date, extents=None):
-        from PIL import Image
         self.start_date_time, self.end_date_time = self.prepare_date(date)
         location_wise_detections = []
         # saving this method call for when we are ready to do other locations
@@ -111,7 +110,6 @@ class Infer:
                 extent['bounding_box'], self.start_date_time, self.end_date_time
             )
             print(f"Total scenes: {len(items)}")
-            items = [items[-5]]
             for item in items:
                 print(f"id: {item['id']}, tile range: {item['tiles']}")
                 scene_ids.append(item['id'])
@@ -123,22 +121,12 @@ class Infer:
                 for index, (imgs, bounding_boxes) in enumerate(image_group):
                     print(index)
                     preds = predict_rcnn(self.model, imgs)
-                    predictions += self.calculate_geojson(preds, bounding_boxes)
+                    predictions.extend(self.calculate_geojson(preds, bounding_boxes))
                     preds = []
                 del(image_group)
                 predictions = predictions[:length]
-                predictions = np.asarray(predictions)
-                columns, rows = [elem[1] - elem[0] for elem in item['tiles']]
-                predictions = predictions.reshape(
-                    (columns, rows, IMG_SIZE, IMG_SIZE)
-                )
-                polygons = self.xy_to_latlon(
-                    predictions, rows, columns, item['coordinates']
-                )
-                del(predictions)
-                del(indices)
-                detection_count += len(polygons)
-                detections.extend(polygons)
+                detection_count += len(predictions)
+                detections.extend(predictions)
 
             location_wise_detections.append({
                 'location': location,
@@ -187,10 +175,10 @@ class Infer:
                     ).convert('RGB')
                 )
                 images.append(img)
-                boundnig_box = mercantile.bounds(x_index, y_index, ZOOM_LEVEL)
+                bounding_box = mercantile.bounds(x_index, y_index, ZOOM_LEVEL)
                 bounding_boxes.append([
-                    boundnig_box.west,
-                    boundnig_box.south,
+                    bounding_box.west,
+                    bounding_box.south,
                     bounding_box.east,
                     bounding_box.north
                 ])
@@ -210,17 +198,17 @@ class Infer:
 
     def xy_to_latlon(self, prediction, bounding_box):
         transform = rasterio.transform.from_bounds(
-            *bounds, IMG_SIZE, IMG_SIZE
+            *bounding_box, IMG_SIZE, IMG_SIZE
         )
         polygon_coordinates = list()
-        segments = (prediction > THRESHOLD).astype('uint8')
-        for idx, ship in enumerate(regionprops(segments)):
+        
+        for idx, ship in enumerate(regionprops(prediction.astype('uint8'))):
             bbox = ship.bbox
             xs = bbox[::2]
             ys = bbox[1::2]
             area = abs(xs[0] - xs[1]) * abs(ys[0] - ys[1])
             lons, lats = rasterio.transform.xy(
-                transform, IMG_SIZE, IMG_SIZE
+                transform, xs, ys
             )
             reformated_bbox = self.planet_downloader.prepare_coordinates(
                 [lons[0], lats[0], lons[1], lats[1]]
