@@ -4,10 +4,16 @@ import os
 import time
 
 from infer import Infer
+from uploader import Uploader
 
 ACCOUNT_NUMBER = '853558080719'
 API_KEY = os.environ['API_KEY']
+
 DETECTED_QUEUE = 'ship_detected_sqs'
+
+IL_USER_NAME = os.environ['IL_USER_NAME']
+IL_PASSWORD = os.environ['IL_PASSWORD']
+
 QUEUE_URL = f"https://queue.amazonaws.com/{ACCOUNT_NUMBER}/{{}}"
 
 ROLE_NAME = 'ShipDetectionEcsRole'
@@ -28,12 +34,13 @@ def assumed_role_session():
     )
 
 infer = Infer(credential=API_KEY)
+uploader = Uploader()
 while True:
     # Get the queue
     session = assumed_role_session()
     sqs_connector = session.client('sqs')
     detection_queue_url = QUEUE_URL.format(SQS_QUEUE)
-    detected_queue_url = QUEUE_URL.format(DETECTED_QUEUE)
+    # detected_queue_url = QUEUE_URL.format(DETECTED_QUEUE)
     detection_messages = sqs_connector.receive_message(
         QueueUrl=detection_queue_url, MessageAttributeNames=['date']
     )
@@ -54,7 +61,7 @@ while True:
                 'date': date,
                 'detections': location_wise_detections
             }
-            print(detections)
+            uploader.upload(detections)
             # sqs_connector.send_message(
             #     QueueUrl=detected_queue_url,
             #     MessageBody=json.dumps(detections)
