@@ -43,23 +43,26 @@ class Uploader:
             polygons = detection['geojson']['features']
             filename_format = f"{location_name}_{date}T000000_{{}}"
             for index, polygon in enumerate(polygons):
-                geojson = { 'type': 'FeatureCollection', 'features': [polygon] }
-                filename = filename_format.format(index)
-                geojson_file_name = f"{filename}.geojson"
-                with open(geojson_file_name, 'w') as geojson_file:
-                    json.dump(geojson, geojson_file)
-                shp_file_name = f"{filename}.shp"
-                args = OGR_OGR + [shp_file_name, geojson_file_name]
-                subprocess.Popen(args).wait()
-                os.remove(geojson_file_name)
-                with ZipFile(f"{filename}.zip", 'w') as zip_file:
-                    for shp_file in glob(f"{filename}.*"):
-                        zip_file.write(shp_file)
-                self.upload_to_image_labeler(f"{filename}.zip")
-                # remove files after uploading
-                for local_file in glob(f"{filename}*"):
-                    os.remove(local_file)
+                self.upload_one_shapefile(index, polygon, filename_format)
 
+
+    def upload_one_shapefile(self, index, polygon, filename_format):
+        geojson = { 'type': 'FeatureCollection', 'features': [polygon] }
+        filename = filename_format.format(index)
+        geojson_file_name = f"{filename}.geojson"
+        with open(geojson_file_name, 'w') as geojson_file:
+            json.dump(geojson, geojson_file)
+        shp_file_name = f"{filename}.shp"
+        args = OGR_OGR + [shp_file_name, geojson_file_name]
+        subprocess.Popen(args).wait()
+        os.remove(geojson_file_name)
+        with ZipFile(f"{filename}.zip", 'w') as zip_file:
+            for shp_file in glob(f"{filename}.*"):
+                zip_file.write(shp_file)
+        self.upload_to_image_labeler(f"{filename}.zip")
+        # remove files after uploading
+        for local_file in glob(f"{filename}*"):
+            os.remove(local_file)
 
     def login(self, username, password):
         """
@@ -109,13 +112,12 @@ class Uploader:
         Returns:
             response (tuple[string]): response text, response code
         """
-
-        with open(file_name, 'rb') as zip_file:
+        with open(file_name, 'rb') as upload_file_name:
             file_headers = {
                 **self.headers,
             }
             files = {
-                'file': (file_name, zip_file),
+                'file': (file_name, upload_file_name),
             }
             response = self.client.post(
                 SHAPEFILE_URL,
