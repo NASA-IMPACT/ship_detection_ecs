@@ -47,6 +47,12 @@ WMTS_URL = f"https://tiles1.planet.com/data/v1/PSScene3Band/{{}}/{ZOOM_LEVEL}/{{
 class Infer:
 
     def __init__(self, weight_path=WEIGHT_FILE, credential=None):
+        """Initializer
+
+        Args:
+            weight_path (string, optional): Location of model weight file
+            credential (None, optional): API credential to Planet
+        """
         self.weight_path = weight_path
         self.model = make_model_rcnn(IMGS_PER_GPU)
         self.credential = credential
@@ -55,13 +61,36 @@ class Infer:
         print('gpu available:', tf.test.is_gpu_available())
 
     def prepare_date(self, date):
+        """Add time information to passed date.
+
+        Args:
+            date (string): 'yyyy-mm-dd' formated date string
+
+        Eg:
+            start_datetime, end_datetime = self.prepare_date('2020-03-01')
+            start_datetime = '2020-03-01T00:00:00Z"'
+            end_datetime = '2020-03-01T23:59:59Z'
+        Returns:
+            list: [start date time, end date time]
+        """
         return [f"{date}T00:00:00Z", f"{date}T23:59:59Z"]
 
     def prepare_model(self):
+        """Prepare Machine Learning model
+
+        Returns:
+            keras.models.Model: keras model loaded from provided path
+        """
         return load_from_path(self.weight_path)
 
 
     def extents(self):
+        """
+            Defines extents based on Area of Intrests defined in COVID Dashboard
+
+        Returns:
+            TYPE: list of extents read from the SITE_URL
+        """
         if not self._extents:
             site_response = requests.get(SITE_URL)
             self._extents = {}
@@ -74,6 +103,12 @@ class Infer:
         return self._extents
 
     def list_scenes(self, date):
+        """
+            List planetscope scene_ids for a given date
+
+        Args:
+            date (string): date in the format 'yyyy-mm-dd'
+        """
         self.start_date_time, self.end_date_time = self.prepare_date(date)
         location_wise_detections = []
         # saving this method call for when we are ready to do other locations
@@ -88,12 +123,35 @@ class Infer:
             print(date, location, [item['id'] for item in items])
 
     def calculate_geojson(self, preds, bounding_boxes):
+        """
+            Calculate the geojson based on the bounding box, and x, y coordinates
+
+        Args:
+            preds (list): List of predictions (masks of ships)
+            bounding_boxes (list): list of boundingboxes for the tiles on which
+            inference was ran
+
+        Returns:
+            TYPE: List of geojsons
+        """
         geojsons = list()
         for index, pred in enumerate(preds):
-            geojsons.extend(self.xy_to_latlon(np.asarray(pred), bounding_boxes[index]))
+            geojsons.extend(
+                self.xy_to_latlon(np.asarray(pred), bounding_boxes[index])
+            )
         return geojsons
 
     def infer(self, date, extents=None):
+        """
+            Infer based on the extents provided or on the cached extents
+
+        Args:
+            date (str): date in 'yyyy-mm-dd' format
+            extents (None, optional): list of extents in [left, bottom, right, top] format
+
+        Returns:
+            dictionary: location wise detections, and total number of detections
+        """
         self.start_date_time, self.end_date_time = self.prepare_date(date)
         location_wise_detections = []
         # saving this method call for when we are ready to do other locations
@@ -138,12 +196,31 @@ class Infer:
         return location_wise_detections, detection_count
 
     def augment_indices(self, indices):
+        """
+            Make sure the list of indices contains total number of elements
+            in factors of IMGS_PER_GPU
+
+        Args:
+            indices (TYPE): list of indices [[x_index, y_index]]
+
+        Returns:
+            list: List of augmented x, y indices.
+        """
         length = len(indices)
         diff = math.ceil(length / IMGS_PER_GPU) * IMGS_PER_GPU - length
         indices += indices[0:diff]
         return indices
 
     def prepare_indices(self, tile_range):
+        """
+            Prepare list of indices for the provided x, y ranges of tiles
+
+        Args:
+            tile_range (list): [[x_min, x_max], [y_min, y_max]]
+
+        Returns:
+            list: list of x, y indices expanding from min to max
+        """
         x_indices, y_indices = tile_range
         indices = list()
         for x_index in list(range(*x_indices)):
@@ -151,15 +228,24 @@ class Infer:
                 indices.append((x_index, y_index))
         return indices
 
-    def prepare_dataset(self, indices, tile_id):
+    def prepare_dataset(self, indices, scene_id):
+        """
+            prepare the images to be infered on for a tile.
 
+        Args:
+            indices (list): list of x, y indices
+            scene_id (str): scene_id on which to iterate
+
+        Yields:
+            TYPE: Description
+        """
         indices = self.augment_indices(indices)
 
         images = list()
         bounding_boxes = list()
         for x_index, y_index in indices:
             tile_url = WMTS_URL.format(
-                tile_id,
+                scene_id,
                 x_index,
                 y_index,
                 self.credential
@@ -188,6 +274,16 @@ class Infer:
 
 
     def prepare_geojson(self, coordinates, area):
+        """
+            Prepare the final geojson for the coordinate and area passed
+
+        Args:
+            coordinates (list): list of coordinate
+            area (int): rounded up area
+
+        Returns:
+            dict: dictionary version of the proper geojson for a single detection
+        """
         geojson = deepcopy(GEOJSON_TEMPLATE)
         geojson['geometry']['coordinates'] = coordinates
         geojson['properties']['area'] = area
@@ -195,6 +291,16 @@ class Infer:
 
 
     def xy_to_latlon(self, prediction, bounding_box):
+        """
+            Convert prediction masks into list of geojsons
+
+        Args:
+            prediction (list): list of masks for ships
+            bounding_box (list): list of boundingboxes for tile location
+
+        Returns:
+            list: list of geojsons for a given list of inferences
+        """
         transform = rasterio.transform.from_bounds(
             *bounding_box, IMG_SIZE, IMG_SIZE
         )
