@@ -36,7 +36,7 @@ GEOJSON_TEMPLATE = {
     }
 }
 
-IMGS_PER_GPU = 20
+IMGS_PER_GPU = 32
 
 SITE_URL = 'https://8ib71h0627.execute-api.us-east-1.amazonaws.com/v1/sites'
 
