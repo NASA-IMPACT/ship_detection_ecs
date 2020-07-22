@@ -62,6 +62,7 @@ while True:
                 'detections': location_wise_detections
             }
             uploader.upload(detections)
+            # Segregating this for now.
             # sqs_connector.send_message(
             #     QueueUrl=detected_queue_url,
             #     MessageBody=json.dumps(detections)
