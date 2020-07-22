@@ -82,8 +82,6 @@ class Infer:
         detection_count = 0
         for extent in extents:
             location = extent['label']
-            detections = list()
-            scene_ids = list()
             items = self.planet_downloader.search_ids(
                 extent['bounding_box'], self.start_date_time, self.end_date_time
             )
@@ -201,7 +199,7 @@ class Infer:
             *bounding_box, IMG_SIZE, IMG_SIZE
         )
         polygon_coordinates = list()
-        
+
         for idx, ship in enumerate(regionprops(prediction.astype('uint8'))):
             bbox = ship.bbox
             xs = bbox[::2]
