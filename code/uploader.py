@@ -36,7 +36,7 @@ class Uploader:
     def __init__(self, username, password):
         self.csrf_token = self.login(username, password)
 
-    def upload(self, detections):
+    def upload_detections(self, detections):
         date = detections['date'].replace('-', '')
         for detection in detections['detections']:
             location_name = detection['location'].replace(' ', '')
@@ -44,6 +44,81 @@ class Uploader:
             filename_format = f"{location_name}_{date}T000000_{{}}"
             for index, polygon in enumerate(polygons):
                 self.upload_one_shapefile(index, polygon, filename_format)
+
+    def crs_to_4326(self, tif_image, dest_image):
+        """
+        converts the geotiff file to appropriate format (crf) and number of bands
+
+        Args:
+            tif_image (string) : original file location to convert
+            dest_image (string) : new file location where the converted file will go
+
+        Returns:
+            None
+        """
+
+        dst_crs = 'EPSG:4326'
+        with rasterio.open(tif_image) as tiff_file:
+            profile = tiff_file.profile
+            transform, width, height = calculate_default_transform(
+                tiff_file.crs,
+                dst_crs,
+                tiff_file.width,
+                tiff_file.height,
+                *tiff_file.bounds
+            )
+
+            profile.update(
+                crs=dst_crs,
+                transform=transform,
+                width=width,
+                height=height,
+                count=3,
+                nodata=0,
+                compress='lzw',
+                dtype='uint8'
+            )
+            with rasterio.open(dest_image, 'w', **profile) as dst:
+                for band in range(1, 4):
+                    reproject(
+                        source=rasterio.band(tiff_file, band),
+                        destination=rasterio.band(dst, band),
+                        src_transform=tiff_file.transform,
+                        src_crs=tiff_file.crs,
+                        dst_transform=transform,
+                        dst_crs=dst_crs,
+                        resampling=Resampling.nearest
+                    )
+
+
+
+    def upload_geotiffs(self, file_name):
+        foldername = f"updated/{file_name.split('/')[-1].split('.')[0]}"
+        mkdir(foldername)
+        with ZipFile(file_name) as zip_file:
+            file_names = zip_file.namelist()
+            for compressed_file in compressed_files:
+                compressed_file = str(compressed_file)
+                if '.tif' in compressed_file and compressed_file.count('.') <= 1:
+                    splits = compressed_file.split('/')
+                    filename_split = splits[-1].split('_')
+                    filename = foldername + '/' + 'T'.join(filename_split[0:2]) + '_' + '_'.join(filename_split[2:])
+                    mem_tiff = zip_file.read(compressed_file)
+                    tiff_file = MemoryFile(mem_tiff).open()
+                    profile = tiff_file.profile
+                    transform, width, height = calculate_default_transform(
+                              tiff_file.crs, 'EPSG:4326', tiff_file.width, tiff_file.height, *tiff_file.bounds)
+                    profile.update(crs='EPSG:4326', transform=transform, width=width, height=height, count=3, nodata=0, compress='lzw', dtype='uint8')
+                    with rasterio.open(filename, 'w', **profile) as dst:
+                        for band in range(1, 4):
+                            reproject(source=rasterio.band(tiff_file, band),
+                                destination=rasterio.band(dst, band),
+                                src_transform=tiff_file.transform,
+                                src_crs=tiff_file.crs,
+                                dst_transform=transform,
+                                dst_crs='EPSG:4326',
+                                resampling=Resampling.nearest)
+
 
 
     def upload_one_shapefile(self, index, polygon, filename_format):

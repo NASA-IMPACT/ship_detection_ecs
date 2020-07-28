@@ -78,4 +78,4 @@ RUN pip3 --no-cache-dir install setuptools && \
     pip3 install config && \
     pip3 install -r requirements.txt
 
-ENTRYPOINT python3 /ship_detection/code/message_consumer.py
+ENTRYPOINT python3 /ship_detection/code/infer_message_consumer.py
