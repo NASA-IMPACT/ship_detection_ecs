@@ -43,6 +43,7 @@ while True:
         QueueUrl=order_queue_url, MessageAttributeNames=['date']
     )
     messages = order_messages.get('Messages', [])
+    s3 = session.resource('s3')
     # extract date information for message
     for msg in messages:
         message_body = msg['Body'] or '{}'
