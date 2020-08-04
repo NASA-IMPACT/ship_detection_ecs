@@ -99,16 +99,14 @@ class Uploader:
             file_names = zip_file.namelist()
             for compressed_file in compressed_files:
                 compressed_file = str(compressed_file)
-                if '.tif' in compressed_file and compressed_file.count('.') <= 1:
-                    splits = compressed_file.split('/')
-                    filename_split = splits[-1].split('_')
-                    filename = foldername + '/' + 'T'.join(filename_split[0:2]) + '_' + '_'.join(filename_split[2:])
+                _, extension = os.path.splitext(compressed_file)
+                if extension == '.tif':
+                    split = compressed_file.split('/')[-1].split('_')
+                    date_time = f"{'T'.join(split[0:2])}_{'_'.join(split[2:])}"
+                    filename = foldername + '/' + date_time
                     mem_tiff = zip_file.read(compressed_file)
                     tiff_file = MemoryFile(mem_tiff).open()
-                    profile = tiff_file.profile
-                    transform, width, height = calculate_default_transform(
-                              tiff_file.crs, 'EPSG:4326', tiff_file.width, tiff_file.height, *tiff_file.bounds)
-                    profile.update(crs='EPSG:4326', transform=transform, width=width, height=height, count=3, nodata=0, compress='lzw', dtype='uint8')
+                    updated_profile = self.calculate_updated_profile(tiff_file)
                     with rasterio.open(filename, 'w', **profile) as dst:
                         for band in range(1, 4):
                             reproject(source=rasterio.band(tiff_file, band),
@@ -120,6 +118,26 @@ class Uploader:
                                 resampling=Resampling.nearest)
 
 
+    def calculate_updated_profile(self, tiff_file):
+        profile = tiff_file.profile
+        transform, width, height = calculate_default_transform(
+            tiff_file.crs,
+            'EPSG:4326',
+            tiff_file.width,
+            tiff_file.height,
+            *tiff_file.bounds
+        )
+        profile.update(
+            crs='EPSG:4326',
+            transform=transform,
+            width=width,
+            height=height,
+            count=3,
+            nodata=0,
+            compress='lzw',
+            dtype='uint8'
+        )
+        return profile
 
     def upload_one_shapefile(self, index, polygon, filename_format):
         geojson = { 'type': 'FeatureCollection', 'features': [polygon] }
