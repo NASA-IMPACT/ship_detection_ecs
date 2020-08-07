@@ -6,10 +6,11 @@ import rasterio
 import requests
 
 from glob import glob
-from zipfile import ZipFile
 
 from rasterio.io import MemoryFile
 from rasterio.warp import reproject, calculate_default_transform, Resampling
+
+from zipfile import ZipFile
 
 BASE_URL = "https://labeler.nasa-impact.net"
 LOGIN_URL = f"{BASE_URL}/accounts/login/"
@@ -39,6 +40,7 @@ IL_URL = {
     'shapefile': f"{BASE_URL}/api/shapefiles",
     'geotiff': f"{BASE_URL}/api/geotiffs"
 }
+
 
 class Uploader:
     def __init__(self, username, password):
