@@ -73,7 +73,8 @@ class Uploader:
                     updated_profile = self.calculate_updated_profile(tiff_file)
                     with rasterio.open(filename, 'w', **updated_profile) as dst:
                         for band in range(1, 4):
-                            reproject(source=rasterio.band(tiff_file, band),
+                            reproject(
+                                source=rasterio.band(tiff_file, band),
                                 destination=rasterio.band(dst, band),
                                 src_transform=tiff_file.transform,
                                 src_crs=tiff_file.crs,
