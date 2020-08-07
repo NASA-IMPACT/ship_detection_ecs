@@ -8,6 +8,9 @@ import requests
 from glob import glob
 from zipfile import ZipFile
 
+from rasterio.io import MemoryFile
+from rasterio.warp import reproject, calculate_default_transform, Resampling
+
 BASE_URL = "https://labeler.nasa-impact.net"
 LOGIN_URL = f"{BASE_URL}/accounts/login/"
 
@@ -32,6 +35,11 @@ OGR_OGR = ['ogr2ogr', '-f', 'ESRI Shapefile']
 
 SHAPEFILE_URL = f"{BASE_URL}/api/shapefiles"
 
+IL_URL = {
+    'shapefile': f"{BASE_URL}/api/shapefiles",
+    'geotiff': f"{BASE_URL}/api/geotiffs"
+}
+
 class Uploader:
     def __init__(self, username, password):
         self.csrf_token = self.login(username, password)
@@ -47,30 +55,35 @@ class Uploader:
                 self.upload_one_shapefile(index, polygon, filename_format)
 
     def upload_geotiffs(self, file_name):
-        foldername = f"updated/{file_name.split('/')[-1].split('.')[0]}"
+        foldername, _ = os.path.splitext(file_name)
         Uploader.mkdir(foldername)
+        location = ''.join(foldername.split('/')[-1].split('_')[: 2])
 
         with ZipFile(file_name) as zip_file:
-            file_names = zip_file.namelist()
+            compressed_files = zip_file.namelist()
             for compressed_file in compressed_files:
                 compressed_file = str(compressed_file)
                 _, extension = os.path.splitext(compressed_file)
                 if extension == '.tif':
                     split = compressed_file.split('/')[-1].split('_')
-                    date_time = f"{'T'.join(split[0:2])}_{'_'.join(split[2:])}"
-                    filename = foldername + '/' + date_time
+                    updated_filename = f"{location}_{'T'.join(split[0:2])}_{'_'.join(split[2:])}"
+                    filename = foldername + '/' + updated_filename
                     mem_tiff = zip_file.read(compressed_file)
                     tiff_file = MemoryFile(mem_tiff).open()
                     updated_profile = self.calculate_updated_profile(tiff_file)
-                    with rasterio.open(filename, 'w', **profile) as dst:
+                    with rasterio.open(filename, 'w', **updated_profile) as dst:
                         for band in range(1, 4):
                             reproject(source=rasterio.band(tiff_file, band),
                                 destination=rasterio.band(dst, band),
                                 src_transform=tiff_file.transform,
                                 src_crs=tiff_file.crs,
-                                dst_transform=transform,
+                                dst_transform=updated_profile['transform'],
                                 dst_crs='EPSG:4326',
                                 resampling=Resampling.nearest)
+                    _, status_code = self.upload_to_image_labeler(filename)
+                    if status_code == 200:
+                        os.remove(filename)
+                    print(f"{filename} uploaded to imagelabeler with: {status_code}")
 
 
     def calculate_updated_profile(self, tiff_file):
@@ -107,7 +120,7 @@ class Uploader:
         with ZipFile(f"{filename}.zip", 'w') as zip_file:
             for shp_file in glob(f"{filename}.*"):
                 zip_file.write(shp_file)
-        self.upload_to_image_labeler(f"{filename}.zip")
+        self.upload_to_image_labeler(f"{filename}.zip", file_type='shapefile')
         # remove files after uploading
         for local_file in glob(f"{filename}*"):
             os.remove(local_file)
@@ -131,7 +144,6 @@ class Uploader:
             'password': password,
             'csrfmiddlewaretoken': csrftoken,
         }
-
         # Log into the server
         response = self.client.post(
             LOGIN_URL,
@@ -139,18 +151,17 @@ class Uploader:
             headers=self.headers
         )
         print(f'Login status: {response.status_code}')
-
         # CSRF Token changes after login, get that
         csrftoken = self.client.cookies['csrftoken']
-
+        
         # Update the login_data's csrftoken field
         self.login_data['csrfmiddlewaretoken'] = csrftoken
 
         # Change the referer header for uploads
-        self.headers['Referer'] = f'{BASE_URL}/geotiff/'
+        self.headers['Referer'] = IL_URL['geotiff']
 
 
-    def upload_to_image_labeler(self, file_name):
+    def upload_to_image_labeler(self, file_name, file_type='geotiff'):
         """
         Uploads a single shapefile to the image labeler
 
@@ -168,7 +179,7 @@ class Uploader:
                 'file': (file_name, upload_file_name),
             }
             response = self.client.post(
-                SHAPEFILE_URL,
+                IL_URL[file_type],
                 data=self.login_data,
                 files=files, headers=file_headers
             )
