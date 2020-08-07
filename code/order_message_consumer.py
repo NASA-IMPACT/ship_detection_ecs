@@ -16,7 +16,7 @@ IL_PASSWORD = os.environ['IL_PASSWORD']
 
 QUEUE_URL = f"https://queue.amazonaws.com/{ACCOUNT_NUMBER}/{{}}"
 
-ROLE_NAME = 'PlanetDataAccessRole'
+ROLE_NAME = 'PlanetOrderEc2Role'
 ROLE_ARN = f'arn:aws:iam::{ACCOUNT_NUMBER}:role/{ROLE_NAME}'
 
 SQS_QUEUE = 'planet_order_received_sqs'
@@ -33,7 +33,9 @@ def assumed_role_session():
         region_name='us-east-1'
     )
 
-uploader = Uploader()
+uploader = Uploader(IL_USER_NAME, IL_PASSWORD)
+Uploader.mkdir('updated')
+
 while True:
     # Get the queue
     session = assumed_role_session()
@@ -53,13 +55,16 @@ while True:
             s3_details = record.get('s3')
             bucket_name = s3_details.get('bucket').get('name')
             added_object = s3_details.get('object').get('key')
-            s3.Bucket(bucket_name).download_file(added_object, added_object)
-            uploader.upload_geotiffs(added_object)
-            os.remove_file(added_object)
+            _, ext = os.path.splitext(added_object)
+            if ext == '.zip':
+                download_filename = f"updated/{added_object.split('/')[-1]}" 
+                s3.Bucket(bucket_name).download_file(added_object, download_filename)
+                uploader.upload_geotiffs(download_filename)
+                os.remove(download_filename)
         session = assumed_role_session()
         sqs_connector = session.client('sqs')
         sqs_connector.delete_message(
-            QueueUrl=detection_queue_url,
+            QueueUrl=order_queue_url,
             ReceiptHandle=msg['ReceiptHandle']
         )
     print('Poll completed')

@@ -14,12 +14,14 @@ DETECTED_QUEUE = 'ship_detected_sqs'
 IL_USER_NAME = os.environ['IL_USER_NAME']
 IL_PASSWORD = os.environ['IL_PASSWORD']
 
+PLANET_ORDER_QUEUE = 'planet_order_place_sqs'
 QUEUE_URL = f"https://queue.amazonaws.com/{ACCOUNT_NUMBER}/{{}}"
 
-ROLE_NAME = 'ShipDetectionEcsRole'
+ROLE_NAME = 'PlanetOrderEc2Role'
 ROLE_ARN = f'arn:aws:iam::{ACCOUNT_NUMBER}:role/{ROLE_NAME}'
 
 SQS_QUEUE = 'ship_detection_sqs'
+
 
 def assumed_role_session():
     client = boto3.client('sts')
@@ -34,13 +36,13 @@ def assumed_role_session():
     )
 
 infer = Infer(credential=API_KEY)
-uploader = Uploader()
+uploader = Uploader(IL_USER_NAME, IL_PASSWORD)
 while True:
     # Get the queue
     session = assumed_role_session()
     sqs_connector = session.client('sqs')
     detection_queue_url = QUEUE_URL.format(SQS_QUEUE)
-    # detected_queue_url = QUEUE_URL.format(DETECTED_QUEUE)
+    planet_order_queue_url = QUEUE_URL.format(PLANET_ORDER_QUEUE)
     detection_messages = sqs_connector.receive_message(
         QueueUrl=detection_queue_url, MessageAttributeNames=['date']
     )
@@ -61,7 +63,11 @@ while True:
                 'date': date,
                 'detections': location_wise_detections
             }
-            uploader.upload(detections)
+            uploader.upload_detections(detections)
+            sqs_connector.send_message(
+                QueueUrl=planet_order_queue_url,
+                MessageBody=json.dumps(detections)
+            )
             # Segregating this for now.
             # sqs_connector.send_message(
             #     QueueUrl=detected_queue_url,
