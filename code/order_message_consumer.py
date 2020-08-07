@@ -21,6 +21,7 @@ ROLE_ARN = f'arn:aws:iam::{ACCOUNT_NUMBER}:role/{ROLE_NAME}'
 
 SQS_QUEUE = 'planet_order_received_sqs'
 
+
 def assumed_role_session():
     client = boto3.client('sts')
     creds = client.assume_role(
@@ -57,8 +58,11 @@ while True:
             added_object = s3_details.get('object').get('key')
             _, ext = os.path.splitext(added_object)
             if ext == '.zip':
-                download_filename = f"updated/{added_object.split('/')[-1]}" 
-                s3.Bucket(bucket_name).download_file(added_object, download_filename)
+                download_filename = f"updated/{added_object.split('/')[-1]}"
+                s3.Bucket(bucket_name).download_file(
+                    added_object,
+                    download_filename
+                )
                 uploader.upload_geotiffs(download_filename)
                 os.remove(download_filename)
         session = assumed_role_session()
