@@ -13,6 +13,8 @@ from rasterio.warp import reproject, calculate_default_transform, Resampling
 from zipfile import ZipFile
 
 BASE_URL = "https://labeler.nasa-impact.net"
+DEFAULT_CRS = 'EPSG:4326'
+
 LOGIN_URL = f"{BASE_URL}/accounts/login/"
 
 FAKE_HEADERS = {
@@ -43,20 +45,51 @@ IL_URL = {
 
 
 class Uploader:
+
     def __init__(self, username, password):
+        """
+        Initializer
+
+        Args:
+            username (str): ImageLabeler Username
+            password (str): ImageLabeler Password
+        """
         self.csrf_token = self.login(username, password)
         Uploader.mkdir('updated')
 
+
     def upload_detections(self, detections):
+        """
+        Upload shapes to imagelabeler
+
+        Args:
+            detections (dict): Dict of detections
+            EG: {
+                    'date': '2020-01-01',
+                    'detections': [{
+                        'location': 'New York',
+                        'geojson': {...},
+                        'scene_ids': [...],
+                    }]
+                }
+        """
         date = detections['date'].replace('-', '')
         for detection in detections['detections']:
             location_name = detection['location'].replace(' ', '')
             polygons = detection['geojson']['features']
             filename_format = f"{location_name}_{date}T000000_{{}}"
             for index, polygon in enumerate(polygons):
-                self.upload_one_shapefile(index, polygon, filename_format)
+                filename = filename_format.format(index)
+                self.upload_one_shapefile(polygon, filename)
+
 
     def upload_geotiffs(self, file_name):
+        """
+        Upload geotiffs into imagelabeler
+
+        Args:
+            file_name (str): path to downloaded geotiff.
+        """
         foldername, _ = os.path.splitext(file_name)
         Uploader.mkdir(foldername)
         location = ''.join(foldername.split('/')[-1].split('_')[: 2])
@@ -67,39 +100,58 @@ class Uploader:
                 compressed_file = str(compressed_file)
                 _, extension = os.path.splitext(compressed_file)
                 if extension == '.tif':
-                    split = compressed_file.split('/')[-1].split('_')
-                    updated_filename = f"{location}_{'T'.join(split[0:2])}_{'_'.join(split[2:])}"
-                    filename = foldername + '/' + updated_filename
-                    mem_tiff = zip_file.read(compressed_file)
-                    tiff_file = MemoryFile(mem_tiff).open()
-                    updated_profile = self.calculate_updated_profile(tiff_file)
-                    with rasterio.open(filename, 'w', **updated_profile) as dst:
-                        for band in range(1, 4):
-                            reproject(
-                                source=rasterio.band(tiff_file, band),
-                                destination=rasterio.band(dst, band),
-                                src_transform=tiff_file.transform,
-                                src_crs=tiff_file.crs,
-                                dst_transform=updated_profile['transform'],
-                                dst_crs='EPSG:4326',
-                                resampling=Resampling.nearest)
-                    _, status_code = self.upload_to_image_labeler(filename)
-                    if status_code == 200:
-                        os.remove(filename)
-                    print(f"{filename} uploaded to imagelabeler with: {status_code}")
+                    self.process_geotiff(compressed_file)
+
+
+    def process_geotiff(self, compressed_file):
+        """
+        Reproject and upload geotiff into imagelabeler
+
+        Args:
+            compressed_file (str): path of tif file in zip file.
+        """
+        split = compressed_file.split('/')[-1].split('_')
+        updated_filename = f"{location}_{'T'.join(split[0:2])}_{'_'.join(split[2:])}"
+        filename = foldername + '/' + updated_filename
+        mem_tiff = zip_file.read(compressed_file)
+        tiff_file = MemoryFile(mem_tiff).open()
+        updated_profile = self.calculate_updated_profile(tiff_file)
+        with rasterio.open(filename, 'w', **updated_profile) as dst:
+            for band in range(1, 4):
+                reproject(
+                    source=rasterio.band(tiff_file, band),
+                    destination=rasterio.band(dst, band),
+                    src_transform=tiff_file.transform,
+                    src_crs=tiff_file.crs,
+                    dst_transform=updated_profile['transform'],
+                    dst_crs=DEFAULT_CRS,
+                    resampling=Resampling.nearest)
+        _, status_code = self.upload_to_image_labeler(filename)
+        if status_code == 200:
+            os.remove(filename)
+        print(f"{filename} uploaded to imagelabeler with: {status_code}")
 
 
     def calculate_updated_profile(self, tiff_file):
+        """
+        Create updated profile for the provided tiff_file
+
+        Args:
+            tiff_file (rasterio.io.MemoryFile): rasterio memoryfile.
+
+        Returns:
+            dict: updated profile for new tiff file
+        """
         profile = tiff_file.profile
         transform, width, height = calculate_default_transform(
             tiff_file.crs,
-            'EPSG:4326',
+            DEFAULT_CRS,
             tiff_file.width,
             tiff_file.height,
             *tiff_file.bounds
         )
         profile.update(
-            crs='EPSG:4326',
+            crs=DEFAULT_CRS,
             transform=transform,
             width=width,
             height=height,
@@ -110,9 +162,16 @@ class Uploader:
         )
         return profile
 
-    def upload_one_shapefile(self, index, polygon, filename_format):
+
+    def upload_one_shapefile(self, polygon, filename):
+        """
+        Upload one shapefile into imagelabeler
+
+        Args:
+            polygon (dict): Polygon in geojson form
+            filename (str): filename to be uploaded into imagelabeler
+        """
         geojson = { 'type': 'FeatureCollection', 'features': [polygon] }
-        filename = filename_format.format(index)
         geojson_file_name = f"{filename}.geojson"
         with open(geojson_file_name, 'w') as geojson_file:
             json.dump(geojson, geojson_file)
@@ -127,6 +186,7 @@ class Uploader:
         # remove files after uploading
         for local_file in glob(f"{filename}*"):
             os.remove(local_file)
+
 
     def login(self, username, password):
         """
@@ -156,13 +216,12 @@ class Uploader:
         print(f'Login status: {response.status_code}')
         # CSRF Token changes after login, get that
         csrftoken = self.client.cookies['csrftoken']
-        
+
         # Update the login_data's csrftoken field
         self.login_data['csrfmiddlewaretoken'] = csrftoken
 
         # Change the referer header for uploads
         self.headers['Referer'] = IL_URL['geotiff']
-
 
     def upload_to_image_labeler(self, file_name, file_type='geotiff'):
         """
