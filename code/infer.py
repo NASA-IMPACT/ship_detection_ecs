@@ -73,7 +73,7 @@ class Infer:
         Returns:
             list: [start date time, end date time]
         """
-        return [f"{date}T00:00:00Z", f"{date}T23:59:59Z"]
+        return f"{date}T00:00:00Z", f"{date}T23:59:59Z"
 
     def prepare_model(self):
         """Prepare Machine Learning model
@@ -123,12 +123,12 @@ class Infer:
             )
             print(date, location, [item['id'] for item in items])
 
-    def calculate_geojson(self, preds, bounding_boxes):
+    def calculate_geojson(self, predictions, bounding_boxes):
         """
             Calculate the geojson based on the bounding box, and x, y coordinates
 
         Args:
-            preds (list): List of predictions (masks of ships)
+            predictions (list): List of predictions (masks of ships)
             bounding_boxes (list): list of boundingboxes for the tiles on which
             inference was ran
 
@@ -136,7 +136,7 @@ class Infer:
             TYPE: List of geojsons
         """
         geojsons = list()
-        for index, pred in enumerate(preds):
+        for index, pred in enumerate(predictions):
             geojsons.extend(
                 self.xy_to_latlon(np.asarray(pred), bounding_boxes[index])
             )
@@ -180,6 +180,7 @@ class Infer:
                     preds = predict_rcnn(self.model, imgs)
                     predictions.extend(self.calculate_geojson(preds, bounding_boxes))
                     preds = []
+                # for memory management
                 del(image_group)
                 predictions = predictions[:length]
                 detection_count += len(predictions)
@@ -224,8 +225,8 @@ class Infer:
         """
         x_indices, y_indices = tile_range
         indices = list()
-        for x_index in list(range(*x_indices)):
-            for y_index in list(range(*y_indices)):
+        for x_index in range(*x_indices):
+            for y_index in range(*y_indices):
                 indices.append((x_index, y_index))
         return indices
 
