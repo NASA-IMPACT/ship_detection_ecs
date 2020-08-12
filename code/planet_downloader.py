@@ -47,14 +47,29 @@ SEARCH_URL = 'https://api.planet.com/data/v1/quick-search'
 class PlanetDownloader:
 
     def __init__(self, api_key):
+        """
+            Initializer
+
+        Args:
+            api_key (str): api key for planet data access
+        """
         self.api_key = api_key
 
     def search_ids(self, extent, start_date_time, end_date_time):
+        """
+            Search scene ids in planet
+
+        Args:
+            extent (list): list of coordinates
+            start_date_time (str): start time in the format "yyyymmddThhddssZ"
+            end_date_time (str): end time in the format "yyyymmddThhddssZ"
+
+        Returns:
+            list: list of ids and tile sizes
+        """
         body = BODY
         body['filter']['config'][0]['config']['coordinates'] = \
-            self.prepare_coordinates(
-                extent
-        )
+            self.prepare_coordinates(extent)
         body['filter']['config'][1]['config'] = {
             'gt': start_date_time,
             'lte': end_date_time
@@ -69,6 +84,15 @@ class PlanetDownloader:
         return self.extract_data(parsed_content['features'])
 
     def extract_data(self, parsed_data):
+        """
+            Extract coordinates and tile information from the response
+
+        Args:
+            parsed_data (list): list of items returned by planet
+
+        Returns:
+            list: list of item ids and x, y tiles.
+        """
         extracted_data = []
         for feature in parsed_data:
             current_data = {'images': []}
@@ -82,12 +106,37 @@ class PlanetDownloader:
         return extracted_data
 
     def revert_coordinates(self, coordinates):
+        """
+            Revert the coordinates from an extended notation to flat coordinate
+            notation
+
+        Args:
+            coordinates (list): list: [
+                [left, down],
+                [right, down],
+                [right, up],
+                [left, up],
+                [left, down]
+            ]
+
+        Returns:
+            list: [left, down, right, top]
+        """
         coordinates = np.asarray(coordinates)
         lats = coordinates[:, :, 1]
         lons = coordinates[:, :, 0]
         return [lons.min(), lats.min(), lons.max(), lats.max()]
 
     def tile_indices(self, coordinates):
+        """
+            Extract tile indices based on coordinates
+
+        Args:
+            coordinates (list): [left, down, right, top]
+
+        Returns:
+            list: [[start_x, end_x], [start_y, end_y]]
+        """
         start_x, start_y, _ = mercantile.tile(
             coordinates[0],
             coordinates[3],
@@ -101,6 +150,22 @@ class PlanetDownloader:
         return [[start_x, end_x], [start_y, end_y]]
 
     def prepare_coordinates(self, extent):
+        """
+            Revert the coordinates from flat notation to extended coordinate
+            notation
+
+        Args:
+            extent (list): [left, down, right, up]
+
+        Returns:
+            list: [
+                [left, down],
+                [right, down],
+                [right, up],
+                [left, up],
+                [left, down]
+            ]
+        """
         return [
             [
                 [extent[0], extent[1]],
