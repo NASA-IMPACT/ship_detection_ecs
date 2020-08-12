@@ -100,15 +100,23 @@ class Uploader:
                 compressed_file = str(compressed_file)
                 _, extension = os.path.splitext(compressed_file)
                 if extension == '.tif':
-                    self.process_geotiff(compressed_file)
+                    self.process_geotiff(
+                        compressed_file,
+                        location,
+                        zip_file,
+                        foldername
+                    )
 
 
-    def process_geotiff(self, compressed_file):
+    def process_geotiff(self, compressed_file, location, zip_file, foldername):
         """
         Reproject and upload geotiff into imagelabeler
 
         Args:
-            compressed_file (str): path of tif file in zip file.
+            compressed_file (str): path of tif file in zip file
+            location (str): location of detection
+            zip_file (zipfile.ZipFile): zipfile instance
+            foldername (str): foldername of where to store file
         """
         split = compressed_file.split('/')[-1].split('_')
         updated_filename = f"{location}_{'T'.join(split[0:2])}_{'_'.join(split[2:])}"
