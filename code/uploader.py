@@ -1,15 +1,13 @@
-import os
-import subprocess
 import base64
 import json
+import os
 import rasterio
 import requests
+import subprocess
 
 from glob import glob
-
 from rasterio.io import MemoryFile
 from rasterio.warp import reproject, calculate_default_transform, Resampling
-
 from zipfile import ZipFile
 
 BASE_URL = "https://labeler.nasa-impact.net"
@@ -120,7 +118,7 @@ class Uploader:
         """
         split = compressed_file.split('/')[-1].split('_')
         updated_filename = f"{location}_{'T'.join(split[0:2])}_{'_'.join(split[2:])}"
-        filename = foldername + '/' + updated_filename
+        filename = f"{foldername}/{updated_filename}"
         mem_tiff = zip_file.read(compressed_file)
         tiff_file = MemoryFile(mem_tiff).open()
         updated_profile = self.calculate_updated_profile(tiff_file)
