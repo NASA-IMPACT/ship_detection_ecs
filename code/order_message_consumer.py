@@ -3,10 +3,10 @@ import json
 import os
 import time
 
+from config import ACCOUNT_NUMBER
 from infer import Infer
 from uploader import Uploader
 
-ACCOUNT_NUMBER = '853558080719'
 API_KEY = os.environ['API_KEY']
 
 DETECTED_QUEUE = 'ship_detected_sqs'
