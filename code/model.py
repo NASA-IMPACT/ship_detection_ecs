@@ -1,5 +1,6 @@
-import numpy as np
 import mrcnn.model as modellib
+import numpy as np
+import os
 import tensorflow as tf
 
 from config import (
@@ -16,10 +17,19 @@ from mrcnn.config import Config
 from mrcnn.model import log
 from tensorflow.keras import models, layers
 
-MODEL_PATH = '/ship_detection/weights/mask_rcnn_airbus_0022.h5'
+MODEL_PATH = os.path.join(
+    os.path.dirname(__file__),
+    '../weights/mask_rcnn_airbus_0022.h5'
+)
+
 # Build U-Net model
 def upsample_conv(filters, kernel_size, strides, padding):
-    return layers.Conv2DTranspose(filters, kernel_size, strides=strides, padding=padding)
+    return layers.Conv2DTranspose(
+        filters,
+        kernel_size,
+        strides=strides,
+        padding=padding
+    )
 
 
 def upsample_simple(filters, kernel_size, strides, padding):
@@ -96,7 +106,7 @@ def load_from_path(weight_file_path):
     return seg_model
 
 
-def make_model_rcnn():
+def make_model_rcnn(total_num_images):
 
     class DetectorConfig(Config):
         # Give the configuration a recognizable name
@@ -132,7 +142,7 @@ def make_model_rcnn():
 
     class InferenceConfig(DetectorConfig):
         GPU_COUNT = 1
-        IMAGES_PER_GPU = 1
+        IMAGES_PER_GPU = total_num_images
 
     inference_config = InferenceConfig()
 
@@ -145,11 +155,18 @@ def make_model_rcnn():
     return model
 
 
-def predict_rcnn(model, img):
-    prediction = model.detect([img])
-    mask = prediction[0]['masks']
-    zero_masks = np.zeros((*mask.shape[:2], 1))
-    if mask.shape[2] == 0:
-        mask = zero_masks
-    mask = np.sum(mask, axis=-1)
-    return mask * 255
+def predict_rcnn(model, images):
+    predictions = model.detect(images)
+    final_preds = list()
+    for pred in (predictions):
+        masks = pred['masks']
+        zero_masks = np.zeros((*masks.shape[:2], 1))
+        if masks.shape[2] == 0:
+            masks = zero_masks
+        masks = np.moveaxis(masks, -1, 0)
+        local_final_preds = zero_masks[:,:,0]
+        for index, mask in enumerate(masks, 1):
+            local_final_preds = np.add(local_final_preds, mask * index)
+        final_preds.append(local_final_preds)
+    return final_preds
+
