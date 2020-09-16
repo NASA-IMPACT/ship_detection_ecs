@@ -16,10 +16,19 @@ from mrcnn.config import Config
 from mrcnn.model import log
 from tensorflow.keras import models, layers
 
-MODEL_PATH = '../weights/mask_rcnn_airbus_0022.h5'
+MODEL_PATH = os.path.join(
+    os.path.dirname(__file__),
+    '../weights/mask_rcnn_airbus_0022.h5'
+)
+
 # Build U-Net model
 def upsample_conv(filters, kernel_size, strides, padding):
-    return layers.Conv2DTranspose(filters, kernel_size, strides=strides, padding=padding)
+    return layers.Conv2DTranspose(
+        filters,
+        kernel_size,
+        strides=strides,
+        padding=padding
+    )
 
 
 def upsample_simple(filters, kernel_size, strides, padding):
