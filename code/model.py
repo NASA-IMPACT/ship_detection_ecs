@@ -1,16 +1,35 @@
+import mrcnn.model as modellib
+import numpy as np
+import os
+import tensorflow as tf
+
 from config import (
-    UPSAMPLE_MODE,
-    NET_SCALING,
-    GAUSSIAN_NOISE,
     EDGE_CROP,
-    IMG_SIZE
+    GAUSSIAN_NOISE,
+    IMG_SIZE,
+    NET_SCALING,
+    UPSAMPLE_MODE
 )
 
+from mrcnn import utils
+from mrcnn import visualize
+from mrcnn.config import Config
+from mrcnn.model import log
 from tensorflow.keras import models, layers
+
+MODEL_PATH = os.path.join(
+    os.path.dirname(__file__),
+    '../weights/mask_rcnn_airbus_0022.h5'
+)
 
 # Build U-Net model
 def upsample_conv(filters, kernel_size, strides, padding):
-    return layers.Conv2DTranspose(filters, kernel_size, strides=strides, padding=padding)
+    return layers.Conv2DTranspose(
+        filters,
+        kernel_size,
+        strides=strides,
+        padding=padding
+    )
 
 
 def upsample_simple(filters, kernel_size, strides, padding):
@@ -85,3 +104,69 @@ def load_from_path(weight_file_path):
     seg_model = make_model((1, IMG_SIZE, IMG_SIZE, 3))
     seg_model.load_weights(weight_file_path)
     return seg_model
+
+
+def make_model_rcnn(total_num_images):
+
+    class DetectorConfig(Config):
+        # Give the configuration a recognizable name
+        NAME = 'airbus'
+
+        GPU_COUNT = 1
+        IMAGES_PER_GPU = 9
+
+        BACKBONE = 'resnet50'
+
+        NUM_CLASSES = 2  # background and ship classes
+
+        IMAGE_MIN_DIM = 384
+        IMAGE_MAX_DIM = 768
+        RPN_ANCHOR_SCALES = (4, 8, 16, 32, 64)
+        TRAIN_ROIS_PER_IMAGE = 64
+        MAX_GT_INSTANCES = 14
+        DETECTION_MAX_INSTANCES = 10
+        DETECTION_MIN_CONFIDENCE = 0.95
+        DETECTION_NMS_THRESHOLD = 0.0
+
+        STEPS_PER_EPOCH = 15
+        VALIDATION_STEPS = 10
+
+        ## balance out losses
+        LOSS_WEIGHTS = {
+            "rpn_class_loss": 30.0,
+            "rpn_bbox_loss": 0.8,
+            "mrcnn_class_loss": 6.0,
+            "mrcnn_bbox_loss": 1.0,
+            "mrcnn_mask_loss": 1.2
+        }
+
+    class InferenceConfig(DetectorConfig):
+        GPU_COUNT = 1
+        IMAGES_PER_GPU = total_num_images
+
+    inference_config = InferenceConfig()
+
+    # Recreate the model in inference mode
+    model = modellib.MaskRCNN(mode='inference',
+                              config=inference_config,
+                              model_dir='../data/')
+    model.load_weights(MODEL_PATH, by_name=True)
+
+    return model
+
+
+def predict_rcnn(model, images):
+    predictions = model.detect(images)
+    final_preds = list()
+    for pred in (predictions):
+        masks = pred['masks']
+        zero_masks = np.zeros((*masks.shape[:2], 1))
+        if masks.shape[2] == 0:
+            masks = zero_masks
+        masks = np.moveaxis(masks, -1, 0)
+        local_final_preds = zero_masks[:,:,0]
+        for index, mask in enumerate(masks, 1):
+            local_final_preds = np.add(local_final_preds, mask * index)
+        final_preds.append(local_final_preds)
+    return final_preds
+
