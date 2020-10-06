@@ -34,7 +34,6 @@ def assumed_role_session():
         region_name='us-east-1'
     )
 
-Uploader.mkdir('updated')
 
 while True:
     uploader = Uploader(IL_USER_NAME, IL_PASSWORD)
