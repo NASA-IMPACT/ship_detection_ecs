@@ -5,6 +5,7 @@ import numpy as np
 import rasterio
 
 from config import (
+    CACHE_SITES,
     EXTENTS,
     IMG_SIZE,
     THRESHOLD,
@@ -20,6 +21,7 @@ from PIL import (
     Image,
     ImageDraw
 )
+
 from planet_downloader import PlanetDownloader
 from skimage.measure import regionprops
 
@@ -32,6 +34,8 @@ GEOJSON_TEMPLATE = {
     }
 }
 
+SITE_URL = 'https://8ib71h0627.execute-api.us-east-1.amazonaws.com/v1/sites'
+
 # had to do this because of how we are running the script
 WEIGHT_FILE = '/ship_detection/weights/iou_model.hdf5'
 WMTS_URL = f"https://tiles1.planet.com/data/v1/PSScene3Band/{{}}/{ZOOM_LEVEL}/{{}}/{{}}.png?api_key={{}}"
@@ -43,6 +47,7 @@ class Infer:
         self.model = self.prepare_model()
         self.credential = credential
         self.planet_downloader = PlanetDownloader(credential)
+        self._extents = None
 
 
     def prepare_date(self, date):
@@ -53,46 +58,66 @@ class Infer:
         return load_from_path(self.weight_path)
 
 
-    def infer(self, date):
+    def extents(self):
+        if not self._extents:
+            site_response = requests.get(SITE_URL)
+            self._extents = {}
+            if site_response.status_code == 200:
+                sites = json.loads(site_response.text)['sites']
+            else:
+                sites = CACHE_SITES
+            for site in sites:
+                self._extents[site['label']] = site['bounding_box']
+        return self._extents
+
+
+    def infer(self, date, extents=None):
         self.start_date_time, self.end_date_time = self.prepare_date(date)
         detections = list()
-        for location, extent  in EXTENTS.items():
+        scene_ids = list()
+        extents = extents or self.extents()
+        for location, extent in self.extents().items():
             items = self.planet_downloader.search_ids(
                 extent, self.start_date_time, self.end_date_time
             )
             for item in items:
                 print(f"id: {item['id']}")
-                images = self.prepare_dataset(item['tiles'], item['id'])
-                predictions = self.model.predict((images / 255.))
+                scene_ids.append(item['id'])
+                predictions = list()
+                for imgs in self.prepare_dataset(item['tiles'], item['id']):
+                    predictions.append(self.model.predict((imgs / 255.))[0])
+                predictions = np.asarray(predictions)
                 columns, rows = [elem[1] - elem[0] for elem in item['tiles']]
                 predictions = predictions.reshape(
                     (rows, columns, IMG_SIZE, IMG_SIZE)
                 )
-                images = images.reshape(
-                    (rows, columns, IMG_SIZE, IMG_SIZE, 3)
-                )
                 polygons = self.xy_to_latlon(
-                    predictions, images, rows, columns, item['coordinates']
+                    predictions, rows, columns, item['coordinates']
                 )
                 detections.extend(polygons)
-        return { 'type': 'FeatureCollection', 'features': detections }
+        detection_dict = { 'type': 'FeatureCollection', 'features': detections }
+        return (scene_ids, detection_dict)
+
 
     def prepare_dataset(self, tile_range, tile_id):
         x_indices, y_indices = tile_range
-        images = list()
         for x_index in list(range(*x_indices)):
-          for y_index in list(range(*y_indices)):
-            response = requests.get(
-              WMTS_URL.format(tile_id, x_index, y_index, self.credential)
-            )
-            response.raise_for_status()
-            img = np.asarray(
-              Image.open(BytesIO(response.content)).resize(
-                  (IMG_SIZE, IMG_SIZE)
-                ).convert('RGB')
-              )
-            images.append(img)
-        return np.asarray(images)
+            for y_index in list(range(*y_indices)):
+                tile_url = WMTS_URL.format(
+                    tile_id,
+                    x_index,
+                    y_index,
+                    self.credential
+                )
+                response = requests.get(tile_url)
+                status_code = response.status_code
+                if status_code == 200:
+                    img = np.asarray(
+                      Image.open(BytesIO(response.content)).resize(
+                          (IMG_SIZE, IMG_SIZE)
+                        ).convert('RGB')
+                      )
+                    yield np.asarray([img])
 
 
     def prepare_geojson(self, coordinates):
@@ -101,7 +126,7 @@ class Infer:
         return geojson
 
 
-    def xy_to_latlon(self, grid_list, images, rows, cols, bounds):
+    def xy_to_latlon(self, grid_list, rows, cols, bounds):
         transform = rasterio.transform.from_bounds(
             *bounds, TILE_SIZE * cols, TILE_SIZE * rows
         )

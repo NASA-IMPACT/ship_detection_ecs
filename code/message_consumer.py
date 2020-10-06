@@ -45,9 +45,13 @@ while True:
             date = json.loads(message_body).get('date')
             if not(date):
                 continue
-            detections = infer.infer(date)
-            detections = { 'date': date, 'detections': detections }
-            print(f"for {date}, number of detections: {len(detections['detections'])}")
+            scene_ids, detections = infer.infer(date)
+            print(f"{date}: number of detections: {len(detections['features'])}")
+            detections = {
+                'date': date,
+                'detections': detections,
+                'scene_ids': scene_ids
+            }
             sqs_connector.send_message(
                 QueueUrl=detected_queue_url,
                 MessageBody=json.dumps(detections)
