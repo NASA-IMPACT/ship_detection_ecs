@@ -11,26 +11,13 @@ from rasterio.warp import reproject, calculate_default_transform, Resampling
 from zipfile import ZipFile
 
 BASE_URL = "https://labeler.nasa-impact.net"
+
+CLIENT_ID = os.environ.get('CLIENT_ID')
+CLIENT_SECRET = os.environ.get('CLIENT_SECRET')
+
 DEFAULT_CRS = 'EPSG:4326'
 
 LOGIN_URL = f"{BASE_URL}/accounts/login/"
-
-FAKE_HEADERS = {
-    'Host': 'labeler.nasa-impact.net',
-    'Connection': 'keep-alive',
-    'Cache-Control': 'max-age=0',
-    'Upgrade-Insecure-Requests': '1',
-    'Origin': f'{BASE_URL}',
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.106 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-    'Sec-Fetch-Site': 'same-origin',
-    'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-User': '?1',
-    'Sec-Fetch-Dest': 'document',
-    'Referer': f'{BASE_URL}/accounts/login/',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Accept-Language': 'en-US,en;q=0.9,hi-IN;q=0.8,hi;q=0.7',
-}
 
 OGR_OGR = ['ogr2ogr', '-f', 'ESRI Shapefile']
 
@@ -52,7 +39,7 @@ class Uploader:
             username (str): ImageLabeler Username
             password (str): ImageLabeler Password
         """
-        self.csrf_token = self.login(username, password)
+        self.request_token(username, password)
         Uploader.mkdir('updated')
 
 
@@ -167,14 +154,6 @@ class Uploader:
         return profile
 
 
-    def upload_one_shapefile(self, polygon, filename):
-        """
-        Upload one shapefile into imagelabeler
-
-        Args:
-            polygon (dict): Polygon in geojson form
-            filename (str): filename to be uploaded into imagelabeler
-        """
     def upload_one_shapefile(self, index, polygon, filename_format):
         geojson = { 'type': 'FeatureCollection', 'features': [polygon] }
         filename = filename_format.format(index)
@@ -194,40 +173,36 @@ class Uploader:
             os.remove(local_file)
 
 
-    def login(self, username, password):
+    def request_token(self, username, password):
         """
-        Logs in user and sets up headers pretending to be a browser
-
+        this funtion will return an authentication token for users to use
         Args:
-            username: ImageLabeler username
-            password: ImageLabeler password
+            username (string) : registered username of the user using the script
+            password (string) : password associated with the user
+        Exceptions:
+            UserNotFound: Given user does not exist
+        Returns:
+            headers (dict): {
+                "Authorization": "Bearer ..."
+            }
         """
-        self.client = requests.session()
-        self.client.get(LOGIN_URL)
-        self.headers = FAKE_HEADERS
 
-        csrftoken = self.client.cookies['csrftoken']
-
-        self.login_data = {
-            'login': username,
-            'password': password,
-            'csrfmiddlewaretoken': csrftoken,
+        payload = {
+            "username": username,
+            "password": password,
+            "grant_type": "password"
         }
-        # Log into the server
-        response = self.client.post(
-            LOGIN_URL,
-            data=self.login_data,
-            headers=self.headers
+
+        response = requests.post(
+            f"{BASE_URL}/authentication/token/",
+            data=payload,
+            auth=(CLIENT_ID, CLIENT_SECRET)
         )
-        print(f'Login status: {response.status_code}')
-        # CSRF Token changes after login, get that
-        csrftoken = self.client.cookies['csrftoken']
+        access_token = json.loads(response.text)['access_token']
+        self.headers = {
+            'Authorization': f"Bearer {access_token}",
+        }
 
-        # Update the login_data's csrftoken field
-        self.login_data['csrfmiddlewaretoken'] = csrftoken
-
-        # Change the referer header for uploads
-        self.headers['Referer'] = IL_URL['geotiff']
 
     def upload_to_image_labeler(self, file_name, file_type='geotiff'):
         """
@@ -246,10 +221,10 @@ class Uploader:
             files = {
                 'file': (file_name, upload_file_name),
             }
-            response = self.client.post(
+            response = requests.post(
                 IL_URL[file_type],
-                data=self.login_data,
-                files=files, headers=file_headers
+                files=files,
+                headers=file_headers
             )
             return response.text, response.status_code
 
