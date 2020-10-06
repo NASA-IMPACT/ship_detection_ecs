@@ -102,6 +102,7 @@ class Infer:
                 self._extents[site['label']] = site['bounding_box']
         return self._extents
 
+
     def list_scenes(self, date):
         """
             List planetscope scene_ids for a given date
@@ -122,6 +123,7 @@ class Infer:
             )
             print(date, location, [item['id'] for item in items])
 
+
     def calculate_geojson(self, predictions, bounding_boxes):
         """
             Calculate the geojson based on the bounding box, and x, y coordinates
@@ -140,6 +142,7 @@ class Infer:
                 self.xy_to_latlon(np.asarray(pred), bounding_boxes[index])
             )
         return geojsons
+
 
     def infer(self, date, extents=None):
         """
@@ -196,6 +199,7 @@ class Infer:
 
         return location_wise_detections, detection_count
 
+
     def augment_indices(self, indices):
         """
             Make sure the list of indices contains total number of elements
@@ -211,6 +215,7 @@ class Infer:
         diff = math.ceil(length / IMGS_PER_GPU) * IMGS_PER_GPU - length
         indices += indices[0:diff]
         return indices
+
 
     def prepare_indices(self, tile_range):
         """
@@ -228,6 +233,7 @@ class Infer:
             for y_index in range(*y_indices):
                 indices.append((x_index, y_index))
         return indices
+
 
     def prepare_dataset(self, indices, scene_id):
         """
