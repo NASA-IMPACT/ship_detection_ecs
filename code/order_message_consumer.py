@@ -34,10 +34,10 @@ def assumed_role_session():
         region_name='us-east-1'
     )
 
-uploader = Uploader(IL_USER_NAME, IL_PASSWORD)
 Uploader.mkdir('updated')
 
 while True:
+    uploader = Uploader(IL_USER_NAME, IL_PASSWORD)
     # Get the queue
     session = assumed_role_session()
     sqs_connector = session.client('sqs')
@@ -73,4 +73,4 @@ while True:
         )
     print('Poll completed')
     # sleep for 10 second before trying to check new messages
-    time.sleep(10)
+    time.sleep(1000)
