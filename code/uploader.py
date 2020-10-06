@@ -77,9 +77,7 @@ class Uploader:
             polygons = detection['geojson']['features']
             filename_format = f"{location_name}_{date}T000000_{{}}"
             for index, polygon in enumerate(polygons):
-                filename = filename_format.format(index)
-                self.upload_one_shapefile(polygon, filename)
-
+                self.upload_one_shapefile(index, polygon, filename_format)
 
     def upload_geotiffs(self, file_name):
         """
@@ -177,7 +175,9 @@ class Uploader:
             polygon (dict): Polygon in geojson form
             filename (str): filename to be uploaded into imagelabeler
         """
+    def upload_one_shapefile(self, index, polygon, filename_format):
         geojson = { 'type': 'FeatureCollection', 'features': [polygon] }
+        filename = filename_format.format(index)
         geojson_file_name = f"{filename}.geojson"
         with open(geojson_file_name, 'w') as geojson_file:
             json.dump(geojson, geojson_file)
