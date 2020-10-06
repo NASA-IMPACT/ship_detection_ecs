@@ -36,7 +36,7 @@ def assumed_role_session():
     )
 
 infer = Infer(credential=API_KEY)
-uploader = Uploader(IL_USER_NAME, IL_PASSWORD)
+
 while True:
     # Get the queue
     session = assumed_role_session()
@@ -48,6 +48,7 @@ while True:
     )
     messages = detection_messages.get('Messages', [])
     # extract date information for message
+    uploader = Uploader(IL_USER_NAME, IL_PASSWORD)
     for msg in messages:
         message_body = msg['Body'] or '{}'
         message = json.loads(message_body)
@@ -59,15 +60,18 @@ while True:
                 extents=extents
             )
             print(f"{date}: number of detections: {detection_count}")
-            detections = {
-                'date': date,
-                'detections': location_wise_detections
-            }
-            uploader.upload_detections(detections)
-            sqs_connector.send_message(
-                QueueUrl=planet_order_queue_url,
-                MessageBody=json.dumps(detections)
-            )
+            for location_wise_detection in location_wise_detections:
+                detections = {
+                    'date': date,
+                    'detections': [location_wise_detection]
+                }
+                uploader.upload_detections(detections)
+                session = assumed_role_session()
+                sqs_connector = session.client('sqs')
+                sqs_connector.send_message(
+                    QueueUrl=planet_order_queue_url,
+                    MessageBody=json.dumps(detections)
+                )
             # Segregating this for now.
             # sqs_connector.send_message(
             #     QueueUrl=detected_queue_url,
@@ -76,8 +80,6 @@ while True:
         else:
             print('Please specify date')
         # delete message from queue
-        session = assumed_role_session()
-        sqs_connector = session.client('sqs')
         sqs_connector.delete_message(
             QueueUrl=detection_queue_url,
             ReceiptHandle=msg['ReceiptHandle']

@@ -113,8 +113,7 @@ class Infer:
         location_wise_detections = []
         # saving this method call for when we are ready to do other locations
         # currently only running for sanfran, LA, and NY
-        # extents or self.extents()
-        extents = self._extents or CACHE_SITES
+        extents = self._extents or CACHE_SITES # extents or self.extents()
         detection_count = 0
         for extent in extents:
             location = extent['label']
