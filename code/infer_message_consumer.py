@@ -36,7 +36,7 @@ def assumed_role_session():
     )
 
 infer = Infer(credential=API_KEY)
-uploader = Uploader(IL_USER_NAME, IL_PASSWORD)
+
 while True:
     # Get the queue
     session = assumed_role_session()
